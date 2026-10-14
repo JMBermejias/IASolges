@@ -20,6 +20,10 @@
 [data-theme="elegante"]{--brand:#4E5A66;--brand-2:#7E8B97;--accent:#C3CDD6;--warn:#9C6B6B}
 
 *{box-sizing:border-box;margin:0;padding:0}
+/* Todo SVG de la app es un icono. icon() los genera sin width/height, y sin
+   esto el navegador los pinta al tamano por defecto (300x150) y el flex los
+   deforma: era lo que agrandaba los iconos de los encabezados de panel. */
+svg{width:1em;height:1em;flex:0 0 auto}
 /* El atributo hidden debe ganar siempre a un display de autor (.layout usa
    flex y .modal-root usa grid); sin esto ambos quedaban visibles. */
 [hidden]{display:none !important}
@@ -191,7 +195,9 @@ a{color:var(--brand-2);text-decoration:none}
   box-shadow:var(--shadow);overflow:hidden}
 .panel-head{padding:13px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
   background:var(--surface-2)}
-.panel-head h3{font-size:13.5px;font-weight:650;flex:1}
+.panel-head h3{font-size:13.5px;font-weight:650;flex:1;display:flex;align-items:center;gap:8px}
+.panel-head h3 svg{width:14px;height:14px;stroke:var(--brand-2);fill:none;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round;flex:0 0 14px}
 .panel-body{padding:17px}
 .panel-body.flush{padding:0}
 

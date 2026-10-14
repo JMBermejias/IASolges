@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prueba de integracion de la API de IASolges."""
 import json
+import re
 import os
 import sys
 import urllib.request
@@ -255,6 +256,21 @@ check("CSS: boton Inicio", ".btn-home" in css)
 check("CSS: barra de actualizacion", ".update-bar" in css)
 check("CSS: ficha de credenciales", ".credits" in css)
 check("CSS: hidden respetado", "[hidden]{display:none" in css)
+
+# Regresion: icon() genera SVG sin width/height. Sin una regla que los limite,
+# el navegador los pinta al tamano por defecto (300x150) y se ven enormes.
+check("CSS: svg global con tamano", "svg{width:1em;height:1em" in css)
+check("CSS: iconos de encabezado de panel con tamano",
+      bool(re.search(r"\.panel-head h3 svg\{width:\d+px", css)))
+check("CSS: iconos de tarjeta con tamano",
+      bool(re.search(r"\.card-ico svg\{width:\d+px", css)))
+# La regla global `svg{width:1em}` es la red de seguridad: garantiza que
+# ningun icono pueda quedar sin tamano aunque falte una regla concreta.
+for cont in (".card-ico svg", ".panel-head h3 svg", ".kpi .k-ico svg", ".btn svg",
+             ".icon-btn svg", ".mini svg", ".feed-item .f-ico svg", ".empty .e-ico svg",
+             ".side-ico svg"):
+    ok_size = bool(re.search(re.escape(cont) + r"\s*\{[^}]*width:\s*\d", css))
+    check(f"CSS: {cont} con tamaño", ok_size)
 
 print("\n=== 12. Borrado ===")
 for m in modules:

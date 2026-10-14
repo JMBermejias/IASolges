@@ -116,6 +116,11 @@ class Ventana:
 
         win.connect("destroy", al_cerrar)
         win.show_all()
+        # Arranca maximizada, ocupando toda la pantalla del escritorio.
+        try:
+            win.maximize()
+        except Exception:                                      # noqa: BLE001
+            pass
         self.win = win
         return win
 
