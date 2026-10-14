@@ -44,3 +44,21 @@ inicial ejecutable, plan de pruebas y estimación económica.
 
 Todos los datos se guardan localmente en SQLite en
 `~/.local/share/iasolges/iasolges.db`. El servidor escucha solo en `127.0.0.1`.
+---
+
+### Nota de la v1.0.0 revisada
+
+La primera versión tenía un fallo de arranque: el lanzador dependía del modo
+ventana de Chrome/Chromium, que no existe en Firefox (el navegador por defecto
+de Zorin), y además se mostraba un modal vacío tapando la interfaz.
+
+**Correcciones incluidas en este paquete:**
+
+- **Ventana nativa GTK + WebKit2**: la aplicación se abre ahora como programa de
+  escritorio real, sin depender del navegador. Si no está disponible, recurre a
+  Chromium/Edge o al navegador del sistema, y si tampoco funciona te muestra la
+  dirección para abrirla a mano.
+- **Modal fantasma eliminado**: el atributo `hidden` ya no lo sobrescribe el
+  `display` de las hojas de estilo.
+- **Iconos del menú superior** corregidos (el botón de tema se veía vacío).
+- **Los datos se guardan en la carpeta de trabajo**: `<carpeta>/data/iasolges.db`.
