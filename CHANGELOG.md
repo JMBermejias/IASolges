@@ -74,3 +74,8 @@ Cambia el verde decorativo por azul claro: acento #2EC4B6 -> #7DD3FC, tema 'verd
 
 Colores mas suaves en toda la interfaz (azules apagados, bordes difusos, sombras tenues), boton Inicio en todas las pantallas, actualizaciones automaticas con boton manual que detecta nuevas versiones en GitHub y las instala con pkexec, boton de credenciales con los datos del autor, y licencia MIT con los datos completos. La version ahora se lee de un unico sitio, corrigiendo que el comprobador de actualizaciones comparaba contra una version obsoleta.
 
+
+## [1.2.1] - 2026-10-14
+
+Reduce el tamano de los iconos y las tarjetas del panel de inicio: iconos de 38px a 29px (glifo de 19px a 15px), altura minima de tarjeta de 132px a 96px, padding y tipografia mas ajustados, y rejilla de 228px a 186px para que quepan mas modulos por fila.
+
