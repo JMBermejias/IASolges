@@ -18,6 +18,9 @@
 [data-theme="elegante"]{--brand:#111827;--brand-2:#374151;--accent:#B45309;--warn:#991B1B}
 
 *{box-sizing:border-box;margin:0;padding:0}
+/* El atributo hidden debe ganar siempre a un display de autor (.layout usa
+   flex y .modal-root usa grid); sin esto ambos quedaban visibles. */
+[hidden]{display:none !important}
 html,body{height:100%}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;

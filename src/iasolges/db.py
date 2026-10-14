@@ -11,9 +11,15 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+_xdata = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+
+# IASOLGES_HOME permite fijar la ubicacion de los datos (respeta el estandar
+# XDG en su defecto, y permite usar la carpeta del proyecto como almacen).
+HOME_DB = os.environ.get("IASOLGES_HOME")
+
 DEFAULT_DB = os.path.join(
-    os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
-    "iasolges", "iasolges.db"
+    HOME_DB or os.path.join(_xdata, "iasolges"),
+    "iasolges.db",
 )
 
 _local = threading.local()

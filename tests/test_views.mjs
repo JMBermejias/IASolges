@@ -136,6 +136,17 @@ check("md tabla sin <br> dentro",
 check("md sin <br> entre bloques", !/h1>[^<]*<br>/.test(md("# H1\n## H2")), md("# H1\n## H2"));
 check("md bloquequote", md("> cita").includes("<blockquote>cita</blockquote>"), md("> cita"));
 
+console.log("\n=== Iconos estaticos ===");
+{
+  const fs2 = await import("node:fs");
+  const html = fs2.readFileSync(path.join(ROOT, "src/iasolges/static/index.html"), "utf8");
+  const usados = [...html.matchAll(/data-icon="([a-z-]+)"/g)].map(m => m[1]);
+  check("index.html tiene data-icon", usados.length > 0, String(usados.length));
+  const faltan = usados.filter(n => !sandbox.__X.icon(n).includes("path")
+                                    && !sandbox.__X.icon(n).includes("circle"));
+  check("todos los data-icon existen en ICONS", faltan.length === 0, faltan.join(","));
+}
+
 console.log("\n=== Render de cada vista contra la API real ===");
 const ROUTES = ["inicio", "mi-trabajo", "clientes", "contactos", "campanas", "favoritos",
                 "mapa", "prompts", "seguridad", "precios", "prospectores", "nombres",

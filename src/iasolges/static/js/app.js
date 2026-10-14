@@ -22,6 +22,14 @@ function markNav(route) {
   $$(".side-item").forEach(b => b.classList.toggle("active", b.dataset.nav === route));
 }
 
+/** Rellena los <span data-icon="..."> del HTML estatico con su SVG. */
+function pintarIconos(root) {
+  $$("[data-icon]", root).forEach(el => {
+    const n = el.dataset.icon;
+    if (n && !el.querySelector("svg")) el.innerHTML = icon(n);
+  });
+}
+
 async function refreshCounts() {
   for (const m of new Set(NAV.flatMap(n => n.items).map(i => i.module).filter(Boolean))) {
     try {
@@ -856,6 +864,7 @@ async function boot() {
   }
 
   buildNav();
+  pintarIconos();
   wireEvents();
 
   const r = location.hash.replace("#/", "");

@@ -44,8 +44,12 @@ check("dashboard KPIs", s == 200 and "clientes" in d, str(d)[:120])
 check("dashboard chart", isinstance(d.get("chart"), dict))
 
 print("\n=== 2. Datos de ejemplo ===")
-s, d = call("POST", "/api/seed-demo", {}); check("seed demo", s == 200 and d.get("seeded"), str(d)[:150])
-s, d = call("GET", "/api/dashboard"); check("clientes seeded = 6", d.get("clientes") == 6, str(d.get("clientes")))
+# seed_demo es idempotente: si ya hay datos no duplica. El test debe tolerarlo.
+s, d = call("POST", "/api/seed-demo", {})
+check("seed demo responde ok", s == 200 and ("seeded" in d), str(d)[:150])
+s, d = call("GET", "/api/dashboard")
+check("clientes seeded >= 6", d.get("clientes", 0) >= 6, str(d.get("clientes")))
+check("contactos seeded >= 6", d.get("contactos", 0) >= 6, str(d.get("contactos")))
 
 print("\n=== 3. CRUD de modulos ===")
 modules = {
