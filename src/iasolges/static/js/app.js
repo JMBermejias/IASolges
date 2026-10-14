@@ -642,7 +642,7 @@ function wireEvents() {
     if (t.closest("#btnQuickAI")) { openGenerator(); return; }
 
     if (t.closest("#btnTheme")) {
-      const order = ["azul", "verde", "morado", "naranja", "elegante"];
+      const order = ["azul", "celeste", "morado", "naranja", "elegante"];
       const cur = document.documentElement.dataset.theme || "azul";
       const nx = order[(order.indexOf(cur) + 1) % order.length];
       document.documentElement.dataset.theme = nx;
@@ -828,7 +828,7 @@ VIEWS["settings"] = async function () {
             ${field("Telefono", input("company_phone", s.company_phone, "tel"))}
             ${field("Moneda", select("currency", s.currency, ["EUR", "USD", "GBP", "MXN"]))}
             ${field("IVA por defecto (%)", input("tax_rate", s.tax_rate, "number", "21", "0.01"))}
-            ${field("Tema", select("theme", s.theme, ["azul", "verde", "morado", "naranja", "elegante"]))}
+            ${field("Tema", select("theme", s.theme, ["azul", "celeste", "morado", "naranja", "elegante"]))}
           </div>
           <div class="flex"><button class="btn btn-primary" type="submit">${icon("save")} Guardar</button></div>
         </form>

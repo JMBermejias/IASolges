@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 SIZES = [16, 24, 32, 48, 64, 128, 256, 512]
 BRAND = (11, 60, 93)      # #0B3C5D
 BRAND2 = (29, 111, 165)   # #1D6FA5
-ACCENT = (46, 196, 182)   # #2EC4B6
+ACCENT = (125, 211, 252)  # #7DD3FC  azul claro
 RADIUS = 0.235            # proportion del lado
 
 

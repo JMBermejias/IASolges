@@ -2,7 +2,7 @@
    IASolges - Hoja de estilos
    ============================================================ */
 :root{
-  --brand:#0B3C5D; --brand-2:#1D6FA5; --accent:#2EC4B6; --warn:#D62828;
+  --brand:#0B3C5D; --brand-2:#1D6FA5; --accent:#7DD3FC; --warn:#D62828;
   --bg:#F1F5F9; --surface:#FFFFFF; --surface-2:#F8FAFC; --line:#E2E8F0;
   --txt:#0F172A; --txt-2:#475569; --txt-3:#94A3B8;
   --ok:#16A34A; --ok-bg:#DCFCE7; --warn-bg:#FEF3C7; --err-bg:#FEE2E2; --info-bg:#DBEAFE;
@@ -12,7 +12,7 @@
   --sidebar-w:268px;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
-[data-theme="verde"]{--brand:#14532D;--brand-2:#2F855A;--accent:#68D391;--warn:#C05621}
+[data-theme="celeste"]{--brand:#0C4A6E;--brand-2:#0284C7;--accent:#7DD3FC;--warn:#C05621}
 [data-theme="morado"]{--brand:#3B0764;--brand-2:#7C3AED;--accent:#A78BFA;--warn:#DB2777}
 [data-theme="naranja"]{--brand:#7C2D12;--brand-2:#EA580C;--accent:#FB923C;--warn:#B91C1C}
 [data-theme="elegante"]{--brand:#111827;--brand-2:#374151;--accent:#B45309;--warn:#991B1B}

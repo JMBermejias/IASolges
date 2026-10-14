@@ -1,0 +1,25 @@
+Package: iasolges
+Version: 1.1.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.8)
+Recommends: xdg-utils | x11-utils
+Maintainer: JMBermejias <noreply@users.noreply.github.com>
+Homepage: https://github.com/JMBermejias/IASolges
+Installed-Size: 836
+Description: IASolges
+ Plataforma de inteligencia artificial para gestion comercial y generacion automatica de programas personalizados.
+ .
+ Modulos de la plataforma:
+ .
+  * Plataforma: Inicio, Mi Trabajo, Clientes, Contactos, Campanas, Favoritos.
+  * Flujo de Trabajo: Mapa Localizador de Clientes, Generador de Prompts,
+    Chequeo de Seguridad, Precios, Prospectores.
+  * Adicionales: Nombres, Kit de Marca, Analizador, Presupuestos.
+ .
+ Incluye un motor de inteligencia artificial local que funciona sin conexion
+ y sin claves. Opcionalmente puede delegar en OpenAI, OpenRouter, DeepSeek,
+ Anthropic u Ollama (configuracion -> Inteligencia Artificial).
+ .
+ Los datos se almacenan localmente en ~/.local/share/iasolges/iasolges.db.

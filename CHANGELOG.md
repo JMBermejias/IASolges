@@ -65,3 +65,7 @@ Todas las novedades relevantes de IASolges.
 - Directorio de datos del usuario con permisos `700`.
 
 [1.0.0]: https://github.com/JMBermejias/IASolges/releases/tag/v1.0.0
+## [1.1.0] - 2026-10-14
+
+Cambia el verde decorativo por azul claro: acento #2EC4B6 -> #7DD3FC, tema 'verde' -> 'celeste' (#0C4A6E/#0284C7/#7DD3FC), icono y favicon. Anade scripts/release.sh para publicar una release completa con un solo comando.
+

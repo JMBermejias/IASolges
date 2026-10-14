@@ -1,0 +1,39 @@
+#!/bin/sh
+# postinst de IASolges
+set -e
+
+DATADIR="$HOME/.local/share/iasolges"
+
+case "$1" in
+    configure)
+        # Directorio de datos del usuario (SQLite). Nunca se borra al desinstalar.
+        mkdir -p "$DATADIR"
+        chmod 700 "$DATADIR"
+
+        # Lanzador accesible desde cualquier shell de usuario.
+        chmod 755 /usr/bin/iasolges 2>/dev/null || true
+        chmod 755 /opt/iasolges/run.py 2>/dev/null || true
+
+        # Refresca caches de iconos y del menu de aplicaciones.
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t /usr/share/icons/hicolor >/dev/null 2>&1 || true
+        fi
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+        fi
+
+        echo ""
+        echo "  IASolges instalado correctamente."
+        echo "  Ejecuta 'iasolges' desde el menu de aplicaciones o desde la terminal."
+        echo ""
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure) ;;
+
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
