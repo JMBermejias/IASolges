@@ -460,3 +460,12 @@ tr:hover .row-actions{opacity:1}
 .panel-head .mini.clean{opacity:.55}
 .panel-head .mini.clean:hover{opacity:1}
 .panel-head:hover .mini.clean{opacity:1}
+
+/* Boton Salir, al pie de la barra lateral */
+.side-item.salir{color:rgba(255,255,255,.72)}
+.side-item.salir:hover{background:rgba(200,110,110,.22);color:#fff}
+.side-item.salir .side-ico svg{stroke-width:2}
+.side-item.salir::after{
+  content:"";position:absolute;left:10px;right:10px;height:1px;
+  background:rgba(255,255,255,.12);top:-6px;
+}

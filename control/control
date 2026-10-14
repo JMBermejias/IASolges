@@ -1,5 +1,5 @@
 Package: iasolges
-Version: 1.2.3
+Version: 1.2.4
 Section: utils
 Priority: optional
 Architecture: all
@@ -7,7 +7,7 @@ Depends: python3 (>= 3.8)
 Recommends: xdg-utils | x11-utils
 Maintainer: JMBermejias <noreply@users.noreply.github.com>
 Homepage: https://github.com/JMBermejias/IASolges
-Installed-Size: 892
+Installed-Size: 896
 Description: IASolges
  Plataforma de inteligencia artificial para gestion comercial y generacion automatica de programas personalizados.
  .

@@ -89,3 +89,8 @@ Arregla los iconos enormes de los encabezados de panel (Actividad reciente, Trab
 
 Anade boton de limpieza en los tres paneles del inicio. Actividad reciente vacia el registro de acciones (log, no afecta a datos de negocio); Trabajos recientes elimina los registros de Mi Trabajo con confirmacion y aviso de que no se puede deshacer; Crecimiento de registros reinicia la ventana temporal del grafico sin borrar ningun dato, con opcion de restaurarlo a 6 meses. Cada limpieza pide confirmacion indicando cuantos registros hay.
 
+
+## [1.2.4] - 2026-10-14
+
+Anade boton Salir al pie de la barra lateral (y atajo Ctrl+Q). Confirma la salida, avisa de que los datos quedan guardados y cierra de verdad: detiene el servidor, cierra la ventana nativa y termina el proceso. La ventana nativa incorpora un vigilante que la cierra sola si el servidor deja de responder.
+

@@ -326,5 +326,54 @@ for m in modules:
 s, d = call("GET", f"/api/clients/{ids['clients']}")
 check("cliente borrado -> 404", s == 404, str(s))
 
+print("\n=== 15. Boton Salir (instancia propia) ===")
+# Necesita su propia instancia: el cierre detiene el servidor.
+import subprocess as _sp
+import tempfile as _tf
+PUERTO_SALIR = 8899
+_dir_salir = _tf.mkdtemp(prefix="iasolges-salir-")
+_raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
+_proc = _sp.Popen([sys.executable, "-m", "iasolges", "--no-browser",
+                   f"--port={PUERTO_SALIR}", f"--data-dir={_dir_salir}"],
+                  cwd=_raiz, stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+URL_S = f"http://127.0.0.1:{PUERTO_SALIR}"
+
+
+def _espera_ping(url, segs=25):
+    import time as _t
+    fin = _t.time() + segs
+    while _t.time() < fin:
+        try:
+            with urllib.request.urlopen(url + "/api/ping", timeout=1) as r:
+                if r.status == 200:
+                    return True
+        except Exception:
+            _t.sleep(0.25)
+    return False
+
+
+check("instancia de prueba arranca", _espera_ping(URL_S), URL_S)
+req = urllib.request.Request(URL_S + "/api/shutdown", method="POST",
+                             data=b"{}", headers={"Content-Type": "application/json"})
+with urllib.request.urlopen(req, timeout=10) as resp:
+    rr = json.loads(resp.read().decode())
+check("shutdown responde ok", rr.get("ok") is True, str(rr)[:100])
+check("shutdown avisa que cierra", "cerrando" in (rr.get("mensaje") or "").lower(),
+      str(rr.get("mensaje")))
+# el proceso debe terminar solo
+try:
+    _proc.wait(timeout=15)
+    terminado = True
+except _sp.TimeoutExpired:
+    terminado = False
+    _proc.kill()
+check("el proceso termina al salir", terminado, "sigue vivo tras 15 s")
+check("el puerto queda libre", not _espera_ping(URL_S, segs=3), "el servidor sigue respondiendo")
+_sp.run(["rm", "-rf", _dir_salir])
+
+print("\n=== 16. El servidor principal sigue en pie ===")
+check("el servidor de las pruebas no fue afectado",
+      call("GET", "/api/ping")[1].get("ok") is True, "el test no debe matar el servidor")
+
 print(f"\n{'='*52}\n  {ok} correctos | {fail} fallidos\n{'='*52}\n")
 sys.exit(1 if fail else 0)

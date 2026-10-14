@@ -644,6 +644,7 @@ function wireEvents() {
     if (t.closest("#btnHome")) { irAlInicio(); return; }
     if (t.closest("#btnUpdate")) { Update.comprobar(false); return; }
     if (t.closest("#btnAbout")) { mostrarCreditos(); return; }
+    if (t.closest("#btnSalir")) { salirDeLaApp(); return; }
 
     if (t.closest("#btnTheme")) {
       const order = ["azul", "celeste", "morado", "naranja", "elegante"];
@@ -739,6 +740,9 @@ function wireEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && Modal.open_) Modal.close();
     if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); $("#globalSearch").focus(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "q" || e.key === "Q")) {
+      e.preventDefault(); salirDeLaApp();
+    }
   });
 
   window.addEventListener("hashchange", () => {
@@ -1044,6 +1048,41 @@ AUTORES O TITULARES DEL COPYRIGHT SERAN RESPONSABLES DE NINGUNA RECLAMACION,
 DAÑOS U OTRAS RESPONSABILIDADES, YA SEA EN UNA ACCION CONTRACTUAL, AGRAVIO O
 CUALQUIER OTRO MOTIVO, DERIVADAS DE, FUERA DE O EN CONEXION CON EL SOFTWARE O SU
 USO U OTRO TIPO DE ACCIONES EN EL SOFTWARE.`;
+
+/* ------------------------------------------------------------ SALIR */
+function salirDeLaApp() {
+  Modal.open("Salir de IASolges", `
+    <p>Se cerrara la aplicacion y se detendra el servidor local.</p>
+    <p class="muted tiny">Tus datos quedan guardados en la carpeta de trabajo y
+      volveran a estar disponibles la proxima vez que abras IASolges.</p>`,
+    `<button class="btn btn-ghost left" data-close>Cancelar</button>
+     <button class="btn btn-danger" id="btnSalirOk">${icon("power")} Salir</button>`, true);
+
+  $("#btnSalirOk").onclick = async () => {
+    const b = $("#btnSalirOk");
+    b.disabled = true;
+    b.innerHTML = '<span class="spin"></span> Cerrando...';
+    // Pantalla de despedida: el servidor caera en cualquier momento.
+    Modal.open("IASolges", `
+      <div class="loading" style="flex-direction:column;height:280px">
+        <div class="boot-logo" style="animation:none">IA</div>
+        <p class="muted">Cerrando IASolges...</p>
+      </div>`, "", true);
+    try { await Api.post("/api/shutdown", {}); } catch (e) { /* el servidor cae */ }
+    // Si sigue vivo (navegador), se avisa y se ofrece recargar.
+    setTimeout(() => {
+      const fuera = Modal.open ? true : false;
+      document.body.innerHTML =
+        '<div style="height:100vh;display:grid;place-content:center;justify-items:center;gap:14px;'
+        + 'font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#F5F8FA;color:#33475B;text-align:center">'
+        + '<div style="width:64px;height:64px;border-radius:18px;display:grid;place-items:center;'
+        + 'background:#47637C;color:#fff;font-weight:800;font-size:24px">IA</div>'
+        + '<h2 style="font-size:17px">IASolges se ha cerrado</h2>'
+        + '<p style="font-size:13px;color:#5F7689;max-width:340px">Puedes cerrar esta pestana con seguridad.</p>'
+        + '</div>';
+    }, 1600);
+  };
+}
 
 /* ------------------------------------------------------------ LIMPIEZA DE PANELES */
 const LIMPIEZA = {

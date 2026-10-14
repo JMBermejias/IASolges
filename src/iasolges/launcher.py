@@ -41,6 +41,13 @@ def log(*a):
 
 
 # ------------------------------------------------------------- datos
+def esperar_salida(evento, apagar):
+    """Espera hasta que se pulse Ctrl+C o alguien detenga el servidor."""
+    import time as _t
+    while not evento.wait(0.25):
+        pass
+
+
 def resolver_db(app_dir):
     """
     Decide donde guardar los datos, en este orden:
@@ -203,11 +210,21 @@ def main(argv=None):
     servidor = threading.Thread(target=httpd.serve_forever, daemon=True)
     servidor.start()
 
+    # Se activa cuando el servidor se detiene, para salir del bucle principal
+    # (por Ctrl+C o por el boton Salir de la interfaz).
+    detenido = threading.Event()
+
     def apagar():
         try:
             httpd.shutdown()
         except Exception:                                      # noqa: BLE001
             pass
+        finally:
+            detenido.set()
+
+    # El boton Salir llama a httpd.shutdown() a traves de la API: se encamina
+    # aqui para que el proceso principal se entere y termine.
+    appmod.Handler.api.on_shutdown = apagar
 
     log("")
     log(f"  IASolges v{appmod.VERSION}")
@@ -242,12 +259,9 @@ def main(argv=None):
                 log("")
                 log(f"  Si no ves la ventana, abre manualmente:  {url}")
                 log("")
-                # El proceso debe seguir vivo sirviendo la app.
-                try:
-                    while True:
-                        time.sleep(1)
-                except KeyboardInterrupt:
-                    apagar()
+                # El proceso sigue vivo sirviendo la app hasta que se
+                # pulse Salir o Ctrl+C.
+                esperar_salida(detenido, apagar)
             log("")
             return 0
 
@@ -264,11 +278,11 @@ def main(argv=None):
         log("")
 
     try:
-        while True:
-            time.sleep(1)
+        esperar_salida(detenido, apagar)
     except KeyboardInterrupt:
-        print("\n  Cerrando IASolges...")
+        print("\n  Cerrando IASolges...", flush=True)
         apagar()
+    log("  IASolges cerrado.")
     return 0
 
 

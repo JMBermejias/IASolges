@@ -71,8 +71,11 @@ def _safe_order(order, fields):
 
 # ------------------------------------------------------------------ rutas
 class Api:
-    def __init__(self, db_path):
+    def __init__(self, db_path, on_shutdown=None):
         self.db = db_path
+        # Se inyecta desde create_server: detiene el servidor al salir.
+        self.on_shutdown = on_shutdown or (lambda: None)
+        self.puerto = 0
 
     # ---- dashboard
     def dashboard(self, q):
@@ -493,6 +496,24 @@ class Api:
         db.set_setting(self.db, "chart_months", "6")
         return {"ok": True, "mensaje": "Grafico restaurado a los ultimos 6 meses."}
 
+    # ---- salida de la aplicacion
+    def cerrar(self):
+        """
+        Detiene el servidor. Se responde primero y se corta despues, para que
+        el navegador reciba la respuesta antes de quedarse sin conexion.
+        """
+        def parar():
+            try:
+                self.on_shutdown()
+            except Exception:                                  # noqa: BLE001
+                pass
+        threading.Timer(0.5, parar).start()
+        return {"ok": True, "mensaje": "Cerrando IASolges...",
+                "url": self.url_actual()}
+
+    def url_actual(self):
+        return f"http://127.0.0.1:{getattr(self, 'puerto', 0) or 0}/"
+
     # ---- ficha del autor
     def creditos(self, q):
         s = db.all_settings(self.db)
@@ -713,6 +734,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "version": VERSION, "ai": ai.provider_info(a.db)})
         if parts[0] == "credits":
             return self._json(a.creditos(q))
+        if parts[0] == "shutdown" and method == "POST":
+            return self._json(a.cerrar())
         if parts[0] == "dashboard":
             if parts[1:2] == ["clear"] and method == "POST":
                 return self._json(a.limpiar_panel((self._body() or {}).get("target", "")))
@@ -815,7 +838,10 @@ def find_free_port(preferred=8765):
 
 def create_server(db_path, port=8765):
     db.init_db(db_path)
-    Handler.api = Api(db_path)
+    api = Api(db_path)
+    Handler.api = api
     httpd = ThreadingHTTPServer(("127.0.0.1", find_free_port(port)), Handler)
     httpd.daemon_threads = True
+    api.puerto = httpd.server_address[1]
+    api.on_shutdown = httpd.shutdown
     return httpd

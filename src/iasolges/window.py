@@ -6,6 +6,7 @@ del navegador. Si WebKitGTK no esta disponible, el lanzador recurre al
 navegador del sistema.
 """
 import os
+import urllib.request
 
 # Errores que GI lanza cuando falta la typelib.
 try:
@@ -127,4 +128,29 @@ class Ventana:
     def ejecutar(self):
         """Muestra la ventana y entra en el bucle GTK (bloqueante)."""
         self.mostrar()
+        self._vigilante()
         Gtk.main()
+
+    def _vigilante(self):
+        """
+        Si el servidor deja de responder, la ventana se cierra sola.
+        Asi el boton Salir cierra la aplicacion por completo, y ademas la
+        ventana se recupera de un fallo del servidor en vez de quedarse
+        congelada mostrando una pagina muerta.
+        """
+        fallos = {"n": 0}
+
+        def comprobar():
+            try:
+                with urllib.request.urlopen(self.url.rstrip("/") + "/api/ping", timeout=2.5) as r:
+                    vivo = r.status == 200
+            except Exception:                                  # noqa: BLE001
+                vivo = False
+            fallos["n"] = 0 if vivo else fallos["n"] + 1
+            # Tres fallos seguidos: el servidor no va a volver.
+            if fallos["n"] >= 3:
+                Gtk.main_quit()
+                return False
+            return True
+
+        GLib.timeout_add(2000, comprobar)
