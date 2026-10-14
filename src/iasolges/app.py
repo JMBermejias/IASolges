@@ -457,6 +457,26 @@ class Api:
         except upd.UpdateError as e:
             return {"ok": False, "error": str(e)}
 
+    # ---- catalogo de modelos
+    def modelos(self, q):
+        s = db.all_settings(self.db)
+        pid = s.get("ai_provider", "local")
+        p = ai.PROVIDERS.get(pid, {})
+        base = s.get("ai_base_url") or p.get("base", "")
+        key = s.get("ai_api_key") or p.get("default_key", "")
+        catalogo = list(ai.OPENCODE_MODELS) if pid == "opencode" else []
+        try:
+            remoto = ai.listar_modelos(base, key)
+        except ai.AIError as e:
+            remoto = {"modelos": [], "total": 0, "error": str(e)}
+        return {"ok": "error" not in remoto,
+                "proveedor": pid,
+                "base": base or p.get("base", ""),
+                "nota": p.get("nota", ""),
+                "catalogo": [{"id": a, "nombre": b} for a, b in catalogo],
+                "remoto": remoto.get("modelos", []),
+                "error": remoto.get("error", "")}
+
     # ---- limpieza de paneles del inicio
     def limpiar_panel(self, target):
         """
@@ -734,6 +754,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "version": VERSION, "ai": ai.provider_info(a.db)})
         if parts[0] == "credits":
             return self._json(a.creditos(q))
+        if parts[0] == "modelos" and method == "GET":
+            return self._json(a.modelos(q))
         if parts[0] == "shutdown" and method == "POST":
             return self._json(a.cerrar())
         if parts[0] == "dashboard":

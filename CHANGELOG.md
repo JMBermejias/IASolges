@@ -94,3 +94,8 @@ Anade boton de limpieza en los tres paneles del inicio. Actividad reciente vacia
 
 Anade boton Salir al pie de la barra lateral (y atajo Ctrl+Q). Confirma la salida, avisa de que los datos quedan guardados y cierra de verdad: detiene el servidor, cierra la ventana nativa y termina el proceso. La ventana nativa incorpora un vigilante que la cierra sola si el servidor deja de responder.
 
+
+## [1.3.0] - 2026-10-14
+
+Anade OpenCode como proveedor de IA con su catalogo de 8 modelos (Space Bunny Free, Cat Jam Free, LongCat 2.5 Preview Free, MiMo-V2.6-Flash Free, Step 5 Preview Free, Muse Spark 1.3 Free, Nemotron 3.5 Lightning Free y Big Pickle) y un endpoint /api/modelos que descarga el catalogo completo del proveedor para alimentar un selector de modelos. Envia User-Agent propio (el endpoint devuelve 403 con el de urllib por defecto) y traduce al castellano los errores conocidos del proveedor.
+

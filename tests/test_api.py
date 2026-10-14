@@ -319,7 +319,60 @@ check("target invalido rechazado", s == 200 and r.get("ok") is False, str(r)[:12
 s, d = call("GET", "/api/dashboard")
 call("POST", "/api/seed-demo", {})
 
-print("\n=== 13. Borrado ===")
+print("\n=== 13. Proveedor OpenCode y catalogo de modelos ===")
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+    from iasolges import ai as _ai
+    check("OpenCode esta en la lista de proveedores", "opencode" in _ai.PROVIDERS)
+    oc = _ai.PROVIDERS["opencode"]
+    check("OpenCode tiene endpoint", oc["base"].startswith("https://opencode.ai"), oc.get("base"))
+    check("OpenCode avisa de la limitacion", bool(oc.get("nota")), oc.get("nota", "")[:50])
+    check("catalogo con 8 modelos", len(_ai.OPENCODE_MODELS) == 8, str(len(_ai.OPENCODE_MODELS)))
+    catalogo_ids = [m[0] for m in _ai.OPENCODE_MODELS]
+    for m in ("space-bunny-free", "cat-jam-free", "longcat-2.5-preview-free",
+              "mimo-v2.6-flash-free", "step-5-preview-free",
+              "muse-spark-1.3-contributor-free", "nemotron-3.5-lightning-free",
+              "big-pickle"):
+        check(f"modelo '{m}' en el catalogo", m in catalogo_ids)
+    check("User-Agent propio definido", "IASolges" in _ai.USER_AGENT, _ai.USER_AGENT)
+    # El endpoint rechaza el User-Agent por defecto de urllib: hay que enviarlo.
+    try:
+        import urllib.request as _u, ssl as _ssl
+        _req = _u.Request(oc["base"] + "/models", headers={"User-Agent": _ai.USER_AGENT})
+        with _u.urlopen(_req, timeout=20, context=_ssl.create_default_context()) as _r:
+            _d = json.loads(_r.read().decode())
+        _ms = _d.get("data", [])
+        check("el endpoint acepta nuestro User-Agent", len(_ms) > 0, f"{len(_ms)} modelos")
+        _todos = {m.get("id") for m in _ms}
+        check("space-bunny-free esta en el endpoint", "space-bunny-free" in _todos)
+        check("los 8 del catalogo estan en el endpoint",
+              all(m in _todos for m in catalogo_ids),
+              ",".join(m for m in catalogo_ids if m not in _todos))
+    except Exception as _e:                                  # noqa: BLE001
+        check("el endpoint acepta nuestro User-Agent", False, str(_e)[:70])
+    # El mensaje de error debe explicarse en castellano
+    msg = _ai._explicar_error(_ai.AIError(
+        '{"type":"error","error":{"type":"FreeTierError",'
+        '"message":"only be used from within OpenCode"}}'))
+    check("error FreeTier traducido", "OpenCode" in msg and "Motor IA Local" in msg, msg[:70])
+    check("error 403 traducido", "403" in _ai._explicar_error(_ai.AIError("HTTP 403")))
+    check("error 401 traducido", "401" in _ai._explicar_error(_ai.AIError("HTTP 401")))
+except ImportError as _e:
+    check("modulo ai importable", False, str(_e))
+
+call("POST", "/api/settings", {"ai_provider": "opencode", "ai_model": "space-bunny-free"})
+s, d = call("GET", "/api/modelos")
+check("endpoint /api/modelos responde", s == 200 and "catalogo" in d and "remoto" in d,
+      str(d)[:100])
+check("/api/modelos trae catalogo", len(d.get("catalogo", [])) == 8,
+      str(len(d.get("catalogo", []))))
+check("/api/modelos trae remotos", len(d.get("remoto", [])) > 0,
+      f"{len(d.get('remoto', []))} remotos, error={d.get('error','')[:40]}")
+
+# volver al motor local para no depender de la red en el resto de pruebas
+call("POST", "/api/settings", {"ai_provider": "local"})
+
+print("\n=== 14. Borrado ===")
 for m in modules:
     s, _ = call("DELETE", f"/api/{m}/{ids[m]}")
     check(f"borrar {m}", s == 200)

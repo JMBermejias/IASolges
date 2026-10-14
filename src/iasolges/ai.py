@@ -23,8 +23,64 @@ PROVIDERS = {
     "deepseek":  {"label": "DeepSeek", "base": "https://api.deepseek.com", "needs_key": True},
     "anthropic": {"label": "Anthropic Claude", "base": "https://api.anthropic.com/v1", "needs_key": True},
     "ollama":    {"label": "Ollama (local)", "base": "http://localhost:11434", "needs_key": False},
+    "opencode":  {"label": "OpenCode", "base": "https://opencode.ai/inference/v1",
+                  "needs_key": True, "default_key": "public",
+                  "nota": "Endpoint compatible con OpenAI. El nivel gratuito solo admite "
+                          "peticiones desde dentro del propio OpenCode."},
     "custom":    {"label": "Compatible OpenAI (personalizado)", "base": "", "needs_key": True},
 }
+
+# Catalogo de modelos de OpenCode (endpoint compatible con OpenAI).
+OPENCODE_MODELS = [
+    ("space-bunny-free", "Space Bunny Free"),
+    ("cat-jam-free", "Cat Jam Free"),
+    ("longcat-2.5-preview-free", "LongCat 2.5 Preview Free"),
+    ("mimo-v2.6-flash-free", "MiMo-V2.6-Flash Free"),
+    ("step-5-preview-free", "Step 5 Preview Free"),
+    ("muse-spark-1.3-contributor-free", "Muse Spark 1.3 Free"),
+    ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free"),
+    ("big-pickle", "Big Pickle"),
+]
+
+
+def listar_modelos(base=None, key=None, timeout=15):
+    """Descarga el catalogo de modelos de un endpoint compatible con OpenAI."""
+    base = (base or PROVIDERS["opencode"]["base"]).rstrip("/")
+    if not base.endswith("/v1") and not base.endswith("/api/v1"):
+        base = base + "/v1"
+    url = base + "/models"
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout,
+                                    context=ssl.create_default_context()) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise AIError(f"El proveedor devolvio HTTP {e.code}")
+    except urllib.error.URLError as e:
+        raise AIError(f"No se pudo contactar con el proveedor: {e.reason}")
+    except (ValueError, TimeoutError, OSError) as e:
+        raise AIError(str(e))
+
+    items = data.get("data") if isinstance(data, dict) else data
+    salida = []
+    for m in (items or []):
+        if not isinstance(m, dict):
+            continue
+        mid = m.get("id") or m.get("name")
+        if not mid:
+            continue
+        salida.append({
+            "id": mid,
+            "nombre": (m.get("name") or mid).replace(mid, m.get("name") or mid).strip(),
+            "contexto": m.get("context_length") or m.get("context") or 0,
+        })
+    salida.sort(key=lambda x: x["id"])
+    return {"base": base, "modelos": salida, "total": len(salida)}
+
+USER_AGENT = "IASolges/1.0 (+https://github.com/JMBermejias/IASolges)"
 
 SYSTEM = ("Eres el motor de IA de IASolges, una plataforma profesional de gestion comercial "
           "y automatizacion. Respondes en el idioma del usuario, con formato claro y accionable. "
@@ -56,6 +112,9 @@ def provider_info(db_path):
 
 def _post_json(url, payload, headers, timeout=120):
     data = json.dumps(payload).encode("utf-8")
+    # Algunos proveedores rechazan el User-Agent por defecto de urllib.
+    headers = dict(headers or {})
+    headers.setdefault("User-Agent", USER_AGENT)
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     ctx = ssl.create_default_context()
     try:
@@ -74,6 +133,31 @@ def _post_json(url, payload, headers, timeout=120):
         raise AIError("Respuesta no valida (JSON) del proveedor")
 
 
+def _explicar_error(e):
+    """Traduce los errores conocidos del proveedor a un mensaje util en castellano."""
+    det = str(e)
+    if "FreeTierError" in det or "only be used from within OpenCode" in det:
+        return ("Nota: el proveedor **OpenCode** no ha atendido la peticion porque su "
+                "nivel gratuito solo admite llamadas desde dentro de la propia aplicacion "
+                "OpenCode. Se muestra el resultado del Motor IA Local, que funciona sin "
+                "conexion. Si tienes una clave propia de otro proveedor (OpenAI, "
+                "OpenRouter, DeepSeek, Anthropic u Ollama) puedes configurarla aqui.")
+    if "403" in det:
+        return ("Nota: el proveedor rechazo la peticion (HTTP 403). Revisa la clave API "
+                "en Configuracion. Se muestra el resultado del Motor IA Local.")
+    if "404" in det:
+        return ("Nota: el proveedor no encontro ese modelo (HTTP 404). Comprueba el "
+                "identificador en Configuracion. Se muestra el resultado del Motor IA Local.")
+    if "401" in det:
+        return ("Nota: la clave API no es valida (HTTP 401). Corrigela en Configuracion. "
+                "Se muestra el resultado del Motor IA Local.")
+    if "429" in det:
+        return ("Nota: se ha alcanzado el limite de peticiones del proveedor (HTTP 429). "
+                "Intentalo mas tarde. Se muestra el resultado del Motor IA Local.")
+    return ("Nota: no se pudo contactar con el proveedor IA (" + det + "). "
+            "Se muestra el resultado del Motor IA Local.")
+
+
 # --------------------------------------------------------------- remoto
 def _call_remote(db_path, prompt, system, temperature, max_tokens):
     s = _settings(db_path)
@@ -81,6 +165,8 @@ def _call_remote(db_path, prompt, system, temperature, max_tokens):
     p = PROVIDERS.get(pid, PROVIDERS["local"])
     base = (s.get("ai_base_url") or p.get("base", "")).rstrip("/")
     key = s.get("ai_api_key", "")
+    if not key and p.get("default_key"):
+        key = p["default_key"]
     model = s.get("ai_model", "") or "gpt-4o-mini"
 
     if pid == "anthropic":
@@ -199,16 +285,19 @@ def generate(db_path, prompt, system=None, temperature=None, max_tokens=None, fa
         try:
             return _call_remote(db_path, prompt, system or SYSTEM, temp, mx)
         except AIError as e:
-            ctx = fallback_ctx or {}
-            txt = local_generate(fallback_task or "general", prompt, ctx)
-            return txt + f"\n\n_(Nota: no se pudo contactar con el proveedor IA ({e}). "\
-                         "Se muestra el resultado del Motor IA Local.)_"
-    res = local_generate(fallback_task or "general", prompt, fallback_ctx or {})
-    # El motor local puede devolver estructuras (dict/list): se serializan para
-    # que el contrato de generate() sea siempre texto.
+            txt = _como_texto(local_generate(fallback_task or "general", prompt,
+                                             fallback_ctx or {}))
+            return txt + "\n\n" + _explicar_error(e)
+    return _como_texto(local_generate(fallback_task or "general", prompt,
+                                      fallback_ctx or {}))
+
+
+def _como_texto(res):
+    """El motor local puede devolver dict o list (geo, campana...): se serializa
+    para que el contrato de generate() sea siempre texto."""
     if isinstance(res, (dict, list)):
         return json.dumps(res, ensure_ascii=False, indent=2)
-    return res
+    return res if isinstance(res, str) else str(res)
 
 
 # --------------------------------------------------------------- MOTOR LOCAL

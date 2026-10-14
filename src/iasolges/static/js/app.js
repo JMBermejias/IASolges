@@ -803,6 +803,15 @@ VIEWS["settings"] = async function () {
   const s = await Api.get("/api/settings");
   const provs = s.providers || {};
   const cur = s.ai_provider || "local";
+  const modInfo = await Api.get("/api/modelos").catch(() => ({}));
+  const opciones = [];
+  if (cur === "opencode") {
+    (modInfo.catalogo || []).forEach(m => opciones.push([m.id, `${m.nombre} (${m.id})`]));
+  }
+  (modInfo.remoto || []).slice(0, 400).forEach(m => {
+    if (!opciones.some(o => o[0] === m.id)) opciones.push([m.id, m.nombre || m.id]);
+  });
+  const datalist = `<datalist id="modelList">${opciones.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join("")}</datalist>`;
   return `
   <div class="page-head"><div><h2>Configuracion</h2>
     <p>Motor de inteligencia artificial, tema y datos de la aplicacion.</p></div></div>
@@ -815,16 +824,24 @@ VIEWS["settings"] = async function () {
           <p>${cur === "local"
             ? "Usas el Motor IA Local integrado: funciona sin conexion y sin claves. Para respuestas de un modelo de lenguaje real, configura un proveedor."
             : "Motor remoto activo. Las respuestas usan el proveedor configurado y, si falla, recurren automaticamente al Motor IA Local."}</p></div>
+        ${modInfo.nota ? `<div class="upd-status warn mb">${icon("info")}<div>
+          <b>Nota sobre este proveedor</b><div class="muted tiny">${esc(modInfo.nota)}</div></div></div>` : ""}
         <form class="form" id="setForm">
           <div class="form-grid">
             ${field("Proveedor", select("ai_provider", cur, Object.entries(provs).map(([k, v]) => [k, v.label])))}
-            ${field("Modelo", input("ai_model", s.ai_model), "Ej: gpt-4o-mini, deepseek-chat, llama3.2")}
+            ${field("Modelo *", `<input type="text" name="ai_model" list="modelList" value="${esc(s.ai_model)}"
+               placeholder="Elige o escribe el identificador del modelo">${datalist}`,
+              opciones.length ? `${opciones.length} modelos disponibles` : "Ej: gpt-4o-mini, space-bunny-free, llama3.2")}
             ${field("URL base (opcional)", input("ai_base_url", s.ai_base_url), "Solo para endpoints compatibles")}
             ${field("Clave API", input("ai_api_key", "", "password", s.ai_api_key_hint || "pega tu clave"), "Se guarda cifrada en tu equipo")}
             ${field("Temperatura", input("ai_temperature", s.ai_temperature, "number", "0.7", "0.1"))}
             ${field("Tokens maximos", input("ai_max_tokens", s.ai_max_tokens, "number", "2000", "100"))}
           </div>
-          <div class="flex"><button class="btn btn-primary" type="submit">${icon("save")} Guardar configuracion</button></div>
+          <div class="flex">
+            <button class="btn btn-primary" type="submit">${icon("save")} Guardar configuracion</button>
+            <button class="btn btn-ghost" id="btnReloadModels">${icon("refresh")} Recargar modelos</button>
+            ${modInfo.error ? `<span class="tiny muted">${esc(modInfo.error)}</span>` : ""}
+          </div>
         </form>
       </div></div>
 
@@ -1205,6 +1222,11 @@ async function boot() {
   });
 
   document.addEventListener("click", async (e) => {
+    if (e.target.closest("#btnReloadModels")) {
+      go("settings", State.params);
+      toast("Modelos recargados del proveedor", "ok");
+      return;
+    }
     if (e.target.closest("#btnBackup")) {
       try {
         const r = await Api.get("/api/backup");
