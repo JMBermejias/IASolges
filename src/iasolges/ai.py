@@ -42,6 +42,27 @@ OPENCODE_MODELS = [
     ("big-pickle", "Big Pickle"),
 ]
 
+# Sugerencias por proveedor. Se muestran siempre, incluso sin clave API, para
+# que el usuario tenga un punto de partida aunque el catalogo remoto falle.
+SUGERIDOS = {
+    "local": [("motor-iasolges-v1", "Motor IA Local (integrado)")],
+    "openai": [("gpt-4o", "GPT-4o"), ("gpt-4o-mini", "GPT-4o mini"),
+               ("gpt-4.1", "GPT-4.1"), ("gpt-4.1-mini", "GPT-4.1 mini"),
+               ("o4-mini", "o4-mini"), ("o3", "o3")],
+    "anthropic": [("claude-opus-4-5", "Claude Opus 4.5"),
+                  ("claude-sonnet-4-5", "Claude Sonnet 4.5"),
+                  ("claude-haiku-4-5", "Claude Haiku 4.5")],
+    "deepseek": [("deepseek-chat", "DeepSeek Chat"),
+                 ("deepseek-reasoner", "DeepSeek Reasoner")],
+    "openrouter": [],
+    "ollama": [("llama3.2", "Llama 3.2"), ("llama3.1", "Llama 3.1"),
+               ("qwen2.5", "Qwen 2.5"), ("qwen3", "Qwen 3"),
+               ("gemma3", "Gemma 3"), ("mistral", "Mistral"),
+               ("deepseek-r1", "DeepSeek R1"), ("phi4", "Phi 4")],
+    "opencode": list(OPENCODE_MODELS),
+    "custom": [],
+}
+
 
 def listar_modelos(base=None, key=None, timeout=15):
     """Descarga el catalogo de modelos de un endpoint compatible con OpenAI."""

@@ -99,3 +99,8 @@ Anade boton Salir al pie de la barra lateral (y atajo Ctrl+Q). Confirma la salid
 
 Anade OpenCode como proveedor de IA con su catalogo de 8 modelos (Space Bunny Free, Cat Jam Free, LongCat 2.5 Preview Free, MiMo-V2.6-Flash Free, Step 5 Preview Free, Muse Spark 1.3 Free, Nemotron 3.5 Lightning Free y Big Pickle) y un endpoint /api/modelos que descarga el catalogo completo del proveedor para alimentar un selector de modelos. Envia User-Agent propio (el endpoint devuelve 403 con el de urllib por defecto) y traduce al castellano los errores conocidos del proveedor.
 
+
+## [1.3.1] - 2026-10-14
+
+Arregla la carga de modelos en Configuracion. El selector era un campo de texto con datalist, que WebKit no despliega en la ventana nativa: ahora es un select real que se rellena solo y se recarga al cambiar de proveedor. Anade listas de modelos sugeridos por proveedor (OpenAI, Anthropic, DeepSeek, Ollama, OpenCode y Motor IA Local) para que siempre haya opciones aunque el catalogo remoto falle por falta de clave, mas un campo para escribir el identificador a mano.
+

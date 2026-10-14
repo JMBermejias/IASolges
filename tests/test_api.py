@@ -360,14 +360,36 @@ try:
 except ImportError as _e:
     check("modulo ai importable", False, str(_e))
 
-call("POST", "/api/settings", {"ai_provider": "opencode", "ai_model": "space-bunny-free"})
-s, d = call("GET", "/api/modelos")
-check("endpoint /api/modelos responde", s == 200 and "catalogo" in d and "remoto" in d,
-      str(d)[:100])
-check("/api/modelos trae catalogo", len(d.get("catalogo", [])) == 8,
-      str(len(d.get("catalogo", []))))
-check("/api/modelos trae remotos", len(d.get("remoto", [])) > 0,
-      f"{len(d.get('remoto', []))} remotos, error={d.get('error','')[:40]}")
+# El endpoint debe responder para TODOS los proveedores, no solo OpenCode:
+# el usuario complained de que solo cargaba el proveedor pero no los modelos.
+s, d = call("GET", "/api/modelos?proveedor=local")
+check("modelos de local", s == 200 and d["total"] >= 1, str(d.get("total")))
+s, d = call("GET", "/api/modelos?proveedor=opencode")
+check("modelos de opencode (sugeridos)", len(d.get("sugeridos", [])) == 8,
+      str(len(d.get("sugeridos", []))))
+check("modelos de opencode (remotos)", len(d.get("remoto", [])) > 0,
+      f"{len(d.get('remoto', []))} remotos")
+for prov, minimo in (("openai", 5), ("anthropic", 3), ("deepseek", 2), ("ollama", 5)):
+    s, d = call("GET", f"/api/modelos?proveedor={prov}")
+    n = len(d.get("sugeridos", []))
+    check(f"modelos sugeridos de {prov}", s == 200 and n >= minimo, f"{n} (min {minimo})")
+    check(f"{prov}: nombre legible", all(m.get("nombre") for m in d.get("sugeridos", [])))
+    check(f"{prov}: indicacion si falta clave", "error" in d and bool(d["error"]) or not d["error"],
+          d.get("error", "")[:40])
+s, d = call("GET", "/api/modelos?proveedor=inventado")
+check("proveedor desconocido no rompe", s == 200 and "sugeridos" in d, str(d)[:80])
+
+# El selector de la interfaz debe ser un <select>, no un datalist:
+# WebKit (ventana nativa) no muestra los desplegables de <datalist>.
+js = urllib.request.urlopen(BASE + "/js/app.js", timeout=10).read().decode()
+html = urllib.request.urlopen(BASE + "/", timeout=10).read().decode()
+check("interfaz sin datalist (no funciona en WebKit)", "datalist" not in js, "queda un datalist")
+check("existe el selector de modelo", 'id="selModelo"' in js, "falta selModelo")
+check("existe el campo de texto libre", 'id="inpModeloLibre"' in js)
+check("existe el indicador de estado", 'id="modelInfo"' in js)
+check("se recarga al cambiar de proveedor", "recargarModelos" in js)
+
+call("POST", "/api/settings", {"ai_provider": "local"})
 
 # volver al motor local para no depender de la red en el resto de pruebas
 call("POST", "/api/settings", {"ai_provider": "local"})

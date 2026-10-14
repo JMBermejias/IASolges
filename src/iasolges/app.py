@@ -460,22 +460,30 @@ class Api:
     # ---- catalogo de modelos
     def modelos(self, q):
         s = db.all_settings(self.db)
-        pid = s.get("ai_provider", "local")
-        p = ai.PROVIDERS.get(pid, {})
-        base = s.get("ai_base_url") or p.get("base", "")
-        key = s.get("ai_api_key") or p.get("default_key", "")
-        catalogo = list(ai.OPENCODE_MODELS) if pid == "opencode" else []
-        try:
-            remoto = ai.listar_modelos(base, key)
-        except ai.AIError as e:
-            remoto = {"modelos": [], "total": 0, "error": str(e)}
-        return {"ok": "error" not in remoto,
+        # Permite consultar el catalogo de un proveedor sin llegar a guardarlo.
+        pid = (q.get("proveedor", [""])[0] or s.get("ai_provider", "local")).strip()
+        p = ai.PROVIDERS.get(pid, ai.PROVIDERS["local"])
+        usar_ajustes = pid == s.get("ai_provider", "local")
+        base = (s.get("ai_base_url") if usar_ajustes else "") or p.get("base", "")
+        key = (s.get("ai_api_key") if usar_ajustes else "") or p.get("default_key", "")
+        sugeridos = ai.SUGERIDOS.get(pid, [])
+
+        remoto, error = [], ""
+        if base:
+            try:
+                remoto = ai.listar_modelos(base, key).get("modelos", [])
+            except ai.AIError as e:
+                error = str(e)
+        return {"ok": not error,
                 "proveedor": pid,
-                "base": base or p.get("base", ""),
+                "etiqueta": p.get("label", pid),
+                "base": base,
                 "nota": p.get("nota", ""),
-                "catalogo": [{"id": a, "nombre": b} for a, b in catalogo],
-                "remoto": remoto.get("modelos", []),
-                "error": remoto.get("error", "")}
+                "necesita_clave": bool(p.get("needs_key")),
+                "sugeridos": [{"id": a, "nombre": b} for a, b in sugeridos],
+                "remoto": remoto,
+                "total": len(sugeridos) + len(remoto),
+                "error": error}
 
     # ---- limpieza de paneles del inicio
     def limpiar_panel(self, target):

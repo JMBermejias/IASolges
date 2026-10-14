@@ -804,14 +804,7 @@ VIEWS["settings"] = async function () {
   const provs = s.providers || {};
   const cur = s.ai_provider || "local";
   const modInfo = await Api.get("/api/modelos").catch(() => ({}));
-  const opciones = [];
-  if (cur === "opencode") {
-    (modInfo.catalogo || []).forEach(m => opciones.push([m.id, `${m.nombre} (${m.id})`]));
-  }
-  (modInfo.remoto || []).slice(0, 400).forEach(m => {
-    if (!opciones.some(o => o[0] === m.id)) opciones.push([m.id, m.nombre || m.id]);
-  });
-  const datalist = `<datalist id="modelList">${opciones.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join("")}</datalist>`;
+  if (typeof estadoModelos !== "undefined") estadoModelos.info = modInfo;
   return `
   <div class="page-head"><div><h2>Configuracion</h2>
     <p>Motor de inteligencia artificial, tema y datos de la aplicacion.</p></div></div>
@@ -824,23 +817,25 @@ VIEWS["settings"] = async function () {
           <p>${cur === "local"
             ? "Usas el Motor IA Local integrado: funciona sin conexion y sin claves. Para respuestas de un modelo de lenguaje real, configura un proveedor."
             : "Motor remoto activo. Las respuestas usan el proveedor configurado y, si falla, recurren automaticamente al Motor IA Local."}</p></div>
-        ${modInfo.nota ? `<div class="upd-status warn mb">${icon("info")}<div>
-          <b>Nota sobre este proveedor</b><div class="muted tiny">${esc(modInfo.nota)}</div></div></div>` : ""}
+        <div id="provNote">${modInfo.nota ? `<div class="upd-status warn mb">${icon("info")}<div>
+          <b>Nota sobre este proveedor</b><div class="muted tiny">${esc(modInfo.nota)}</div></div></div>` : ""}</div>
         <form class="form" id="setForm">
           <div class="form-grid">
             ${field("Proveedor", select("ai_provider", cur, Object.entries(provs).map(([k, v]) => [k, v.label])))}
-            ${field("Modelo *", `<input type="text" name="ai_model" list="modelList" value="${esc(s.ai_model)}"
-               placeholder="Elige o escribe el identificador del modelo">${datalist}`,
-              opciones.length ? `${opciones.length} modelos disponibles` : "Ej: gpt-4o-mini, space-bunny-free, llama3.2")}
+            ${field("Modelo *", `<div style="display:flex;flex-direction:column;gap:7px">
+                 <select name="ai_model" id="selModelo" data-actual="${esc(s.ai_model)}"></select>
+                 <input type="text" name="ai_model_libre" id="inpModeloLibre"
+                   placeholder="o escribe el identificador del modelo" style="display:none">
+               </div>`, "Se elige de la lista o se escribe a mano")}
             ${field("URL base (opcional)", input("ai_base_url", s.ai_base_url), "Solo para endpoints compatibles")}
             ${field("Clave API", input("ai_api_key", "", "password", s.ai_api_key_hint || "pega tu clave"), "Se guarda cifrada en tu equipo")}
             ${field("Temperatura", input("ai_temperature", s.ai_temperature, "number", "0.7", "0.1"))}
             ${field("Tokens maximos", input("ai_max_tokens", s.ai_max_tokens, "number", "2000", "100"))}
           </div>
+          <div class="flex-between mb" id="modelInfo" style="font-size:12px"></div>
           <div class="flex">
             <button class="btn btn-primary" type="submit">${icon("save")} Guardar configuracion</button>
             <button class="btn btn-ghost" id="btnReloadModels">${icon("refresh")} Recargar modelos</button>
-            ${modInfo.error ? `<span class="tiny muted">${esc(modInfo.error)}</span>` : ""}
           </div>
         </form>
       </div></div>
@@ -1168,6 +1163,82 @@ async function confirmarLimpieza(target) {
   };
 }
 
+/* ==================== SELECTOR DE MODELOS ==================== */
+const OPCION_LIBRE = "__libre__";
+let estadoModelos = { info: {} };
+
+function pintarModelos(info, actual) {
+  const sel = $("#selModelo");
+  const libre = $("#inpModeloLibre");
+  if (!sel) return;
+  const lista = [];
+  const meter = (id, nombre, grupo) => {
+    if (!id || lista.some(x => x.id === id)) return;
+    lista.push({ id, nombre: nombre || id, grupo });
+  };
+  (info.sugeridos || []).forEach(m => meter(m.id, m.nombre, "Sugeridos"));
+  (info.remoto || []).forEach(m => meter(m.id, m.nombre, "Del proveedor"));
+  sel.innerHTML = "";
+  let grupo = "";
+  lista.forEach(m => {
+    if (m.grupo !== grupo) {
+      grupo = m.grupo;
+      const g = document.createElement("optgroup");
+      g.label = grupo;
+      sel.appendChild(g);
+    }
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.id === m.nombre ? m.id : `${m.nombre}  (${m.id})`;
+    sel.appendChild(o);
+  });
+  const libreOpt = document.createElement("option");
+  libreOpt.value = OPCION_LIBRE;
+  libreOpt.textContent = "+ Escribir otro modelo a mano...";
+  sel.appendChild(libreOpt);
+  const actualVisible = lista.some(m => m.id === actual);
+  sel.value = actualVisible ? actual : OPCION_LIBRE;
+  if (!actualVisible && actual) libre.value = actual;
+  libre.style.display = sel.value === OPCION_LIBRE ? "" : "none";
+
+  const info2 = $("#modelInfo");
+  if (info2) {
+    const err = info.error;
+    info2.innerHTML = err
+      ? `<span class="badge b-warn">${icon("alert", 10)} Sin catalogo remoto</span>
+         <span class="tiny muted">${esc(err)}</span>`
+      : `<span class="badge b-ok">${icon("check", 10)} ${lista.length} modelos</span>`;
+  }
+}
+
+async function recargarModelos(proveedor) {
+  const info = await Api.get("/api/modelos", { proveedor }).catch(() => ({ sugeridos: [], remoto: [] }));
+  estadoModelos.info = info;
+  const libre = $("#setForm [name=ai_model_libre]");
+  pintarModelos(info, (libre && libre.value) || ($("#selModelo") || {}).value || "");
+  const nota = $("#provNote");
+  if (nota) nota.innerHTML = info.nota
+    ? `<div class="upd-status warn mb">${icon("info")}<div><b>Nota</b>
+       <div class="muted tiny">${esc(info.nota)}</div></div></div>` : "";
+}
+
+
+/* ---------- arranque del selector de modelos en Configuracion ---------- */
+function initSelectorModelos() {
+  if (typeof pintarModelos !== "function") return;
+  const sel = $("#selModelo");
+  if (!sel) return;
+  const libre0 = $("#inpModeloLibre");
+  pintarModelos(estadoModelos.info || {}, (libre0 && libre0.value) || "");
+  const selProv = $("#setForm [name=ai_provider]");
+  if (selProv) selProv.onchange = () => recargarModelos(selProv.value);
+  const libre = $("#inpModeloLibre");
+  if (libre && !libre.value) libre.value = sel.dataset.actual || "";
+  sel.onchange = () => {
+    if (libre) libre.style.display = sel.value === "__libre__" ? "" : "none";
+  };
+}
+
 /* ------------------------------------------------------------ BOOT */
 async function boot() {
   try {
@@ -1197,6 +1268,10 @@ async function boot() {
   $("#boot").remove();
   $("#layout").hidden = false;
 
+  // Selector de modelos: se pinta al abrir Configuracion y se recarga solo
+  // cada vez que se cambia de proveedor.
+  if (State.route === "settings") initSelectorModelos();
+
   $("#globalSearch").addEventListener("input", debounce(function () {
     State.params.q = State.params.q || {};
     if (this.value) State.params.q.search = this.value; else delete State.params.q.search;
@@ -1209,7 +1284,14 @@ async function boot() {
     if (f.id !== "setForm" && f.id !== "appForm") return;
     e.preventDefault();
     const d = Object.fromEntries(new FormData(f).entries());
-    if (f.id === "setForm" && d.ai_provider !== "local" && !d.ai_api_key) delete d.ai_api_key;
+    if (f.id === "setForm") {
+      // Si el usuario escribio el modelo a mano, ese es el que cuenta.
+      const libre = String(d.ai_model_libre || "").trim();
+      if (libre) d.ai_model = libre;
+      delete d.ai_model_libre;
+      if (d.ai_provider !== "local" && !d.ai_api_key) delete d.ai_api_key;
+      if (!d.ai_model) { toast("Elige o escribe un modelo", "warn"); return; }
+    }
     try {
       await Api.post("/api/settings", d);
       toast("Configuracion guardada", "ok");
@@ -1218,6 +1300,12 @@ async function boot() {
       $("#engineName").textContent = ping.ai.label;
       $("#engineBox").classList.toggle("remote", ping.ai.provider !== "local");
       if (f.id === "appForm" && d.theme) document.documentElement.dataset.theme = d.theme;
+      if (f.id === "setForm") {
+        // Tras guardar, el catalogo se vuelve a pedir con la clave ya en su sitio.
+        estadoModelos.info = await Api.get("/api/modelos").catch(() => ({}));
+        const sel2 = $("#selModelo");
+        if (sel2) { sel2.dataset.actual = d.ai_model; pintarModelos(estadoModelos.info, d.ai_model); }
+      }
     } catch (err) { toast(err.message, "err"); }
   });
 

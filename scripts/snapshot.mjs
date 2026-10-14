@@ -37,7 +37,7 @@ vm.createContext(sandbox);
 for (const f of ["core.js", "views.js", "app.js"]) {
   vm.runInContext(fs.readFileSync(path.join(JS, f), "utf8"), sandbox, { filename: f });
 }
-vm.runInContext("globalThis.__X = { VIEWS, NAV, esc, icon, buildNav, SUBTITLES, limpiarBtn };", sandbox);
+vm.runInContext("globalThis.__X = { VIEWS, NAV, esc, icon, buildNav, SUBTITLES, limpiarBtn, Api };", sandbox);
 const { VIEWS, NAV, esc, icon, buildNav, SUBTITLES, limpiarBtn } = sandbox.__X;
 
 /* cuerpo del sidebar, identico al de la app real */
