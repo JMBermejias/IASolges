@@ -426,6 +426,12 @@ def _seed(conn):
         "currency": "EUR",
         "tax_rate": "21",
         "onboarding_done": "0",
+        # Ficha del autor (se muestra en el boton de credenciales)
+        "author_name": "Jose Manuel Bernabeu Mejias",
+        "author_address": "Medico Rafael Navarro 2, 2C\nNovelda, 03660 Alicante\nEspaña",
+        "author_email": "jose.manuel.bernabeu@outlook.com",
+        # Comprobacion automatica de actualizaciones
+        "auto_check_updates": "1",
     }
     for k, v in defaults.items():
         conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)", (k, v))

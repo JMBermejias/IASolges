@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prueba de integracion de la API de IASolges."""
 import json
+import os
 import sys
 import urllib.request
 
@@ -39,6 +40,7 @@ def has(label, data, key, minlen=1):
 
 print("\n=== 1. Nucleo ===")
 s, d = call("GET", "/api/ping"); check("ping", s == 200 and d.get("ok"))
+ping_version = d.get("version")
 s, d = call("GET", "/api/dashboard")
 check("dashboard KPIs", s == 200 and "clientes" in d, str(d)[:120])
 check("dashboard chart", isinstance(d.get("chart"), dict))
@@ -201,7 +203,60 @@ check("filtro status sin inyeccion", s == 200, str(s))
 s, d = call("GET", "/static/../iasolges/db.py")
 check("escape de static bloqueado", "sqlite3" not in str(d), str(s))
 
-print("\n=== 9. Borrado ===")
+print("\n=== 9. Credenciales del autor ===")
+s, d = call("GET", "/api/credits")
+check("endpoint credenciales", s == 200 and "nombre" in d, str(d)[:120])
+check("nombre completo", d.get("nombre") == "Jose Manuel Bernabeu Mejias", str(d.get("nombre")))
+addr = d.get("direccion", "")
+check("direccion: medico", "Medico Rafael Navarro 2" in addr, addr[:60])
+check("direccion: 2C", "2C" in addr, addr[:60])
+check("direccion: Novelda", "Novelda" in addr, addr[:60])
+check("direccion: codigo postal", "03660" in addr, addr[:60])
+check("direccion: Alicante", "Alicante" in addr, addr[:60])
+check("licencia MIT", d.get("licencia") == "MIT", str(d.get("licencia")))
+check("copyright con nombre", "Jose Manuel Bernabeu Mejias" in d.get("copyright", ""),
+      str(d.get("copyright")))
+check("version coherente", d.get("version") == ping_version, str(d.get("version")))
+
+print("\n=== 10. Actualizaciones ===")
+s, d = call("GET", "/api/update/check")
+check("endpoint check", s == 200 and d.get("ok") is True, str(d)[:150])
+check("compara versiones", d.get("actual") == ping_version, str(d.get("actual")))
+if d.get("ok"):
+    check("informa ultima version", bool(d.get("ultima")), str(d.get("ultima")))
+    check("informa repositorio", d.get("repositorio") == "JMBermejias/IASolges",
+          str(d.get("repositorio")))
+    if d.get("hay_actualizacion"):
+        check("paquete .deb publicado", str(d.get("paquete", "")).endswith(".deb"),
+              str(d.get("paquete"))[:70])
+
+# URLs no oficiales deben rechazarse siempre
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+    from iasolges.update import descargar, UpdateError, _url_oficial
+    check("URL oficial aceptada",
+          _url_oficial("https://github.com/JMBermejias/IASolges/releases/download/v1.0.0/a.deb"))
+    check("URL externa rechazada", not _url_oficial("https://evil.com/iasolges.deb"))
+    check("URL de otro repo rechazada", not _url_oficial("https://github.com/otro/repo/a.deb"))
+    check("http rechazado", not _url_oficial("http://github.com/JMBermejias/IASolges/a.deb"))
+    check("extensión no .deb rechazada",
+          not _url_oficial("https://github.com/JMBermejias/IASolges/x.sh"))
+except ImportError:
+    check("modulo update importable", False, "No se pudo importar iasolges.update")
+
+print("\n=== 11. Botones en la interfaz ===")
+html = urllib.request.urlopen(BASE + "/", timeout=10).read().decode()
+for idbtn in ("btnHome", "btnUpdate", "btnAbout", "btnTheme", "btnQuickAI"):
+    check(f"boton #{idbtn} en el HTML", f'id="{idbtn}"' in html)
+check("contenedor updateBar", 'id="updateBar"' in html)
+
+css = urllib.request.urlopen(BASE + "/css/app.css", timeout=10).read().decode()
+check("CSS: boton Inicio", ".btn-home" in css)
+check("CSS: barra de actualizacion", ".update-bar" in css)
+check("CSS: ficha de credenciales", ".credits" in css)
+check("CSS: hidden respetado", "[hidden]{display:none" in css)
+
+print("\n=== 12. Borrado ===")
 for m in modules:
     s, _ = call("DELETE", f"/api/{m}/{ids[m]}")
     check(f"borrar {m}", s == 200)

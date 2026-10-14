@@ -45,15 +45,23 @@
         <p id="pageSub">Panel de control</p>
       </div>
       <div class="topbar-actions">
+        <button class="btn-home" id="btnHome" title="Volver al inicio">
+          <span data-icon="home"></span> Inicio
+        </button>
         <label class="search">
           <span data-icon="search"></span>
           <input type="search" id="globalSearch" placeholder="Buscar en el modulo..." autocomplete="off">
         </label>
+        <button class="icon-btn update" id="btnUpdate" title="Buscar actualizaciones">
+          <span data-icon="download"></span><span class="dot"></span>
+        </button>
+        <button class="icon-btn" id="btnAbout" title="Acerca de y credenciales"><span data-icon="info"></span></button>
         <button class="icon-btn" id="btnTheme" title="Cambiar tema"><span data-icon="sun"></span></button>
         <button class="btn btn-primary" id="btnQuickAI"><span data-icon="sparkles"></span> Generar con IA</button>
       </div>
     </header>
 
+    <div id="updateBar"></div>
     <section class="content" id="view"><!-- inyectado por JS --></section>
   </main>
 </div>

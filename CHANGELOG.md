@@ -69,3 +69,8 @@ Todas las novedades relevantes de IASolges.
 
 Cambia el verde decorativo por azul claro: acento #2EC4B6 -> #7DD3FC, tema 'verde' -> 'celeste' (#0C4A6E/#0284C7/#7DD3FC), icono y favicon. Anade scripts/release.sh para publicar una release completa con un solo comando.
 
+
+## [1.2.0] - 2026-10-14
+
+Colores mas suaves en toda la interfaz (azules apagados, bordes difusos, sombras tenues), boton Inicio en todas las pantallas, actualizaciones automaticas con boton manual que detecta nuevas versiones en GitHub y las instala con pkexec, boton de credenciales con los datos del autor, y licencia MIT con los datos completos. La version ahora se lee de un unico sitio, corrigiendo que el comprobador de actualizaciones comparaba contra una version obsoleta.
+

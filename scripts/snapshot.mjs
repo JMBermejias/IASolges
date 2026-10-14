@@ -74,12 +74,20 @@ const html = `<!DOCTYPE html><html lang="es" data-theme="azul"><head><meta chars
       <div class="topbar-title"><h1>${esc(meta.label)}</h1>
         <p>${esc(SUBTITLES[route] || "")}</p></div>
       <div class="topbar-actions">
+        <button class="btn-home${route === "inicio" ? " on" : ""}">${icon("home")} Inicio</button>
         <label class="search">${icon("search")}
           <input type="search" placeholder="Buscar en el modulo..."></label>
+        <button class="icon-btn update has-update"><span class="dot"></span>${icon("download")}</button>
+        <button class="icon-btn">${icon("info")}</button>
         <button class="icon-btn">${icon("sun")}</button>
         <button class="btn btn-primary">${icon("sparkles")} Generar con IA</button>
       </div>
     </header>
+    <div class="update-bar"><span class="u-ico">${icon("download")}</span>
+      <div class="u-txt"><b>Hay una version nueva disponible: v1.2.0</b>
+      <span>Tu version es la 1.1.0. La actualizacion se instala en un solo paso.</span></div>
+      <button class="btn btn-primary">${icon("download")} Actualizar ahora</button>
+      <button class="icon-btn">${icon("x")}</button></div>
     <section class="content">${view}</section>
   </main>
 </div></body></html>`;

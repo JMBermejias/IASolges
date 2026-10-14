@@ -13,11 +13,13 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
+from . import __version__
 from . import ai, db
+from . import update as upd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(HERE, "static")
-VERSION = "1.0.0"
+VERSION = __version__   # fuente unica de verdad (src/iasolges/__init__.py)
 
 MODULES = {
     "clients": {"label": "Clientes", "icon": "users", "group": "Plataforma"},
@@ -423,6 +425,47 @@ class Api:
     def backup(self, q):
         return {"db_path": self.db, "stats": db.stats(self.db), "version": VERSION}
 
+    # ---- actualizaciones
+    def update_check(self, q):
+        try:
+            return {"ok": True, **upd.comprobar(VERSION)}
+        except upd.UpdateError as e:
+            return {"ok": False, "error": str(e), "actual": VERSION,
+                    "hay_actualizacion": False}
+
+    def update_apply(self, data, q):
+        url = (data.get("url") or "").strip()
+        if not url:
+            try:
+                info = upd.comprobar(VERSION)
+                if not info.get("hay_actualizacion"):
+                    return {"ok": False, "error": "Ya tienes la ultima version."}
+                url = info.get("paquete", "")
+            except upd.UpdateError as e:
+                return {"ok": False, "error": str(e)}
+        try:
+            ruta = upd.descargar(url)
+            res = upd.instalar(ruta)
+            res["ruta"] = ruta
+            res["reiniciar"] = True
+            return res
+        except upd.UpdateError as e:
+            return {"ok": False, "error": str(e)}
+
+    # ---- ficha del autor
+    def creditos(self, q):
+        s = db.all_settings(self.db)
+        return {
+            "nombre": s.get("author_name", "Jose Manuel Bernabeu Mejias"),
+            "direccion": s.get("author_address",
+                               "Medico Rafael Navarro 2, 2C\nNovelda, 03660 Alicante\nEspana"),
+            "email": s.get("author_email", ""),
+            "licencia": "MIT",
+            "copyright": f"(c) {db.now()[:4]} Jose Manuel Bernabeu Mejias",
+            "version": VERSION,
+            "repositorio": upd.REPO_SLUG,
+        }
+
     def import_csv(self, module, text, q):
         import csv
         import io as _io
@@ -627,6 +670,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if parts[0] == "ping":
             return self._json({"ok": True, "version": VERSION, "ai": ai.provider_info(a.db)})
+        if parts[0] == "credits":
+            return self._json(a.creditos(q))
+        if parts[0] == "update":
+            if parts[1:2] == ["check"] and method == "GET":
+                return self._json(a.update_check(q))
+            if parts[1:2] == ["apply"] and method == "POST":
+                return self._json(a.update_apply(self._body(), q))
         if parts[0] == "dashboard" and method == "GET":
             return self._json(a.dashboard(q))
         if parts[0] == "favorites" and method == "GET":

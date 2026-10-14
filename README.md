@@ -190,6 +190,43 @@ src/iasolges/
 
 ---
 
-## Licencia
+## Autor y licencia
 
-MIT — ver [LICENSE](LICENSE).
+**Jose Manuel Bernabeu Mejias**
+
+Medico Rafael Navarro 2, 2C
+Novelda, 03660 Alicante, España
+
+Software bajo **licencia MIT**. Eres libre de usar, copiar, modificar, publicar,
+distribuir, sublicenciar y/o vender este software.
+
+Copyright (c) 2026 Jose Manuel Bernabeu Mejias — ver [LICENSE](LICENSE).
+
+---
+
+## Novedades de esta version
+
+### Botones de la barra superior
+
+- **Inicio**: vuelve al panel principal desde cualquier pantalla.
+- **Actualizar**: comprueba manualmente si hay una version nueva en GitHub. Si la hay,
+  muestra las novedades y ofrece instalarla en un solo paso.
+- **Acerca de**: ficha con los datos del autor y la licencia MIT.
+
+### Actualizaciones automaticas
+
+IASolges consulta la ultima release de GitHub al arrancar y cada 6 horas. Si detecta una
+version nueva aparece un aviso con el boton **Actualizar ahora**.
+
+La instalacion se hace con `pkexec`, que pide tu contrasena de forma grafica. Si `pkexec`
+no esta disponible, la aplicacion te muestra el comando exacto para ejecutarlo.
+
+Por seguridad solo se descargan paquetes publicados en la release oficial del repositorio
+(`https://github.com/JMBermejias/IASolges`), siempre por HTTPS y siempre validados como
+paquete `.deb` antes de instalarse.
+
+### Paleta mas suave
+
+Los colores de la interfaz son ahora mas suaves y de bajo contraste: azules apagados,
+bordes difusos y sombras tenues. Los cinco temas disponibles son azul, celeste, morado,
+naranja y elegante.

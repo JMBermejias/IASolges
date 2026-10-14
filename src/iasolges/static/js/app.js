@@ -54,6 +54,7 @@ async function go(route, params) {
   $("#pageTitle").textContent = meta.label;
   $("#pageSub").textContent = SUBTITLES[route] || "";
   document.title = meta.label + " - IASolges";
+  marcarBotonInicio();
   $("#modSearch") && ($("#modSearch").value = (State.params.q && State.params.q.search) || "");
   $("#globalSearch").value = (State.params.q && State.params.q.search) || "";
 
@@ -640,6 +641,9 @@ function wireEvents() {
     if (t.closest("[data-close]")) { Modal.close(); return; }
     if (t.closest("#btnMenu")) { $("#sidebar").classList.toggle("open"); return; }
     if (t.closest("#btnQuickAI")) { openGenerator(); return; }
+    if (t.closest("#btnHome")) { irAlInicio(); return; }
+    if (t.closest("#btnUpdate")) { Update.comprobar(false); return; }
+    if (t.closest("#btnAbout")) { mostrarCreditos(); return; }
 
     if (t.closest("#btnTheme")) {
       const order = ["azul", "celeste", "morado", "naranja", "elegante"];
@@ -845,6 +849,201 @@ VIEWS["settings"] = async function () {
   </div>`;
 };
 
+/* ------------------------------------------------------------ INICIO */
+function irAlInicio() {
+  $("#modSearch") && ($("#modSearch").value = "");
+  $("#globalSearch").value = "";
+  go("inicio", {});
+}
+function marcarBotonInicio() {
+  $("#btnHome").classList.toggle("on", State.route === "inicio");
+}
+
+/* ------------------------------------------------------------ ACTUALIZACIONES */
+const Update = {
+  estado: null,
+
+  async comprobar(silencioso) {
+    const btn = $("#btnUpdate");
+    btn.classList.add("busy");
+    try {
+      const r = await Api.get("/api/update/check");
+      Update.estado = r;
+      btn.classList.toggle("has-update", !!r.hay_actualizacion);
+      Update.pintarBarra();
+      if (!silencioso) Update.mostrarDialogo(r);
+      return r;
+    } catch (e) {
+      if (!silencioso) toast("No se pudo comprobar: " + e.message, "err");
+      return { ok: false, error: e.message };
+    } finally {
+      btn.classList.remove("busy");
+    }
+  },
+
+  pintarBarra() {
+    const r = Update.estado || {};
+    const bar = $("#updateBar");
+    if (!r.hay_actualizacion) { bar.innerHTML = ""; return; }
+    bar.innerHTML = `<div class="update-bar">
+      <span class="u-ico">${icon("download")}</span>
+      <div class="u-txt"><b>Hay una version nueva disponible: v${esc(r.ultima)}</b>
+        <span>Tu version es la ${esc(r.actual)}. La actualizacion se instala en un solo paso.</span></div>
+      <button class="btn btn-primary" id="btnUpdNow">${icon("download")} Actualizar ahora</button>
+      <button class="icon-btn" id="btnUpdLater" title="Ahora no">${icon("x")}</button>
+    </div>`;
+    $("#btnUpdNow").onclick = () => Update.aplicar();
+    $("#btnUpdLater").onclick = () => { $("#updateBar").innerHTML = ""; };
+  },
+
+  mostrarDialogo(r) {
+    if (!r.ok) {
+      Modal.open("Buscar actualizaciones",
+        `<div class="upd-status err">${icon("alert")}<div>
+          <b>No se pudo consultar GitHub</b><div class="muted tiny">${esc(r.error || "")}</div>
+        </div></div>
+        <p class="muted tiny">Comprueba tu conexion a Internet e intentalo de nuevo.</p>`,
+        `<button class="btn btn-ghost" data-close>Cerrar</button>`, true);
+      return;
+    }
+    if (!r.hay_actualizacion) {
+      Modal.open("Buscar actualizaciones",
+        `<div class="upd-status ok">${icon("check")}<div>
+          <b>Ya tienes la ultima version</b>
+          <div class="muted tiny">Version instalada: ${esc(r.actual)}</div></div></div>
+         <p class="muted tiny">Comprobado en ${esc(new Date().toLocaleString("es-ES"))} contra
+           ${esc(r.repositorio || "")}.</p>`,
+        `<button class="btn btn-primary" data-close>Cerrar</button>`, true);
+      return;
+    }
+    Modal.open("Actualizacion disponible",
+      `<div class="upd-status warn">${icon("download")}<div>
+        <b>Version ${esc(r.ultima)} disponible</b>
+        <div class="muted tiny">Tu version es la ${esc(r.actual)}${r.publicado ? " · publicada el " + new Date(r.publicado).toLocaleDateString("es-ES") : ""}</div>
+      </div></div>
+      ${r.notas ? `<div class="section-title"><h3>Novedades</h3><div class="line"></div></div>
+        <div class="output" style="max-height:260px;overflow:auto">${md(r.notas)}</div>` : ""}
+      <p class="tiny muted mt">Se descargara el paquete .deb y se instalara con tu contrasena de administrador.</p>`,
+      `<button class="btn btn-ghost left" data-close>Ahora no</button>
+       <button class="btn btn-ghost" id="uWeb">${icon("globe")} Ver en GitHub</button>
+       <button class="btn btn-primary" id="uNow">${icon("download")} Actualizar ahora</button>`, true);
+    $("#uNow").onclick = () => Update.aplicar();
+    $("#uWeb").onclick = () => window.open(r.url, "_blank");
+  },
+
+  async aplicar() {
+    const r = Update.estado || {};
+    Modal.open("Actualizando IASolges",
+      `<div class="loading"><span class="spin dark"></span>
+        Descargando el paquete y preparandolo para instalar...</div>`, "", true);
+    try {
+      const res = await Api.post("/api/update/apply", { url: r.paquete || "" });
+      if (res.ok) {
+        Modal.open("Actualizacion completada",
+          `<div class="upd-status ok">${icon("check")}<div>
+            <b>IASolges se ha actualizado correctamente</b>
+            <div class="muted tiny">${esc((res.salida || "").slice(-400))}</div></div></div>
+           <p class="muted tiny">Cierra la aplicacion y vuelve a abrirla para usar la nueva version.</p>`,
+          `<button class="btn btn-primary" id="uClose">Cerrar IASolges</button>`, true);
+        $("#uClose").onclick = () => { Modal.close(); window.close(); location.reload(); };
+      } else if (res.metodo === "manual") {
+        Modal.open("Instalacion manual",
+          `<p>La instalacion automatica no esta disponible en este equipo.</p>
+           <p class="muted tiny">Ejecuta este comando en una terminal:</p>
+           <div class="output mono" style="margin-top:10px">${esc(res.comando || res.salida || "")}</div>
+           <p class="muted tiny mt">Despues reinicia IASolges para aplicar los cambios.</p>`,
+          `<button class="btn btn-ghost" id="uCopyCmd">${icon("copy")} Copiar comando</button>
+           <button class="btn btn-primary" data-close>Cerrar</button>`, true);
+        $("#uCopyCmd").onclick = () => doCopy(res.comando || res.salida || "", "Comando");
+      } else {
+        Modal.open("No se pudo actualizar",
+          `<div class="upd-status err">${icon("alert")}<div>
+            <b>La instalacion fallo</b>
+            <div class="muted tiny">${esc((res.salida || res.error || "").slice(-500))}</div></div></div>`,
+          `<button class="btn btn-primary" data-close>Cerrar</button>`, true);
+      }
+    } catch (e) {
+      Modal.open("No se pudo actualizar",
+        `<div class="upd-status err">${icon("alert")}<div>
+          <b>Error al actualizar</b><div class="muted tiny">${esc(e.message)}</div></div></div>`,
+        `<button class="btn btn-primary" data-close>Cerrar</button>`, true);
+    }
+  },
+
+  /* Comprobacion automatica al arrancar y cada 6 horas. */
+  arrancar() {
+    setTimeout(() => Update.comprobar(true), 2500);
+    setInterval(() => Update.comprobar(true), 6 * 60 * 60 * 1000);
+  },
+};
+
+/* ------------------------------------------------------------ CREDITOS */
+async function mostrarCreditos() {
+  let c = {};
+  try { c = await Api.get("/api/credits"); } catch (e) {}
+  const nombre = c.nombre || "Jose Manuel Bernabeu Mejias";
+  const dir = c.direccion || "Medico Rafael Navarro 2, 2C\nNovelda, 03660 Alicante\nEspana";
+  Modal.open("Acerca de IASolges", `
+    <div class="credits">
+      <div class="cr-mark">IA</div>
+      <div class="cr-name">${esc(nombre)}</div>
+      <div class="cr-role">Autor y desarrollador de IASolges</div>
+
+      <div class="cr-box">
+        <div class="row">${icon("pin")}<div><div class="k">Domicilio</div>
+          <div class="v">${esc(dir)}</div></div></div>
+        <div class="row">${icon("file-text")}<div><div class="k">Licencia</div>
+          <div class="v">MIT &middot; ${esc(c.copyright || "(c) " + new Date().getFullYear() + " " + nombre)}</div></div></div>
+        <div class="row">${icon("globe")}<div><div class="k">Repositorio</div>
+          <div class="v mono">github.com/${esc(c.repositorio || "JMBermejias/IASolges")}</div></div></div>
+        <div class="row">${icon("cpu")}<div><div class="k">Version</div>
+          <div class="v">${esc(c.version || "1.0.0")}</div></div></div>
+      </div>
+
+      <div class="cr-copy">
+        <span class="lic-badge">${icon("check", 12)} Software libre bajo licencia MIT</span>
+        <div style="margin-top:12px">
+         IASolges &copy; ${esc((c.copyright || "").replace(/^\(c\)\s*/i, ""))}<br>
+          Software de gestion comercial con inteligencia artificial.<br>
+          Este software se distribuye tal cual, sin garantia de ningun tipo.
+        </div>
+      </div>
+    </div>`,
+    `<button class="btn btn-ghost left" id="crLic">${icon("file-text")} Ver licencia</button>
+     <button class="btn btn-primary" data-close>Cerrar</button>`, true);
+
+  $("#crLic").onclick = () => {
+    Modal.open("Licencia MIT", `<div class="output"><pre><code>${esc(LICENCIA_MIT)}</code></pre></div>`,
+      `<button class="btn btn-ghost" id="crCopy">${icon("copy")} Copiar</button>
+       <button class="btn btn-primary" data-close>Cerrar</button>`, true);
+    $("#crCopy").onclick = () => doCopy(LICENCIA_MIT, "Licencia");
+  };
+}
+
+const LICENCIA_MIT = `MIT License
+
+Copyright (c) ${new Date().getFullYear()} Jose Manuel Bernabeu Mejias
+Medico Rafael Navarro 2, 2C
+Novelda, 03660 Alicante, Espana
+
+Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia
+de este software y de los archivos de documentacion asociados (el "Software"),
+a utilizar el Software sin restricciones, incluyendo sin limitacion los derechos
+a usar, copiar, modificar, fusionar, publicar, distribuir, sublicenciar y/o vender
+copias del Software, y a permitir a las personas a quienes se les proporcione el
+Software a hacer lo mismo, sujeto a las siguientes condiciones:
+
+El aviso de copyright anterior y este aviso de permiso se incluiran en todas las
+copias o partes sustanciales del Software.
+
+EL SOFTWARE SE PROPORCIONA "COMO ESTA", SIN GARANTIA DE NINGUN TIPO, EXPRESA O
+IMPLICITA, INCLUIDAS PERO NO LIMITADAS A LAS GARANTIAS DE COMERCIALIZACION,
+IDONEIDAD PARA UN PROPOSITO PARTICULAR E INCUMPLIMIENTO. EN NINGUN CASO LOS
+AUTORES O TITULARES DEL COPYRIGHT SERAN RESPONSABLES DE NINGUNA RECLAMACION,
+DAÑOS U OTRAS RESPONSABILIDADES, YA SEA EN UNA ACCION CONTRACTUAL, AGRAVIO O
+CUALQUIER OTRO MOTIVO, DERIVADAS DE, FUERA DE O EN CONEXION CON EL SOFTWARE O SU
+USO U OTRO TIPO DE ACCIONES EN EL SOFTWARE.`;
+
 /* ------------------------------------------------------------ BOOT */
 async function boot() {
   try {
@@ -869,6 +1068,7 @@ async function boot() {
 
   const r = location.hash.replace("#/", "");
   await go(VIEWS[r] ? r : "inicio");
+  Update.arrancar();
 
   $("#boot").remove();
   $("#layout").hidden = false;
