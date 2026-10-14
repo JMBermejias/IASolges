@@ -84,6 +84,12 @@ const SUBTITLES = {
 };
 
 function afterRender(route) {
+  // El selector de modelos vive dentro de la vista de Configuracion y se
+  // construye en el DOM: hay que pintarlo cada vez que se entra en ella,
+  // no solo al arrancar (si no, el <select> llega vacio).
+  if (route === "settings" && typeof initSelectorModelos === "function") {
+    try { initSelectorModelos(); } catch (e) { console.error("selector modelos", e); }
+  }
   const f = $("#modSearch");
   if (f) f.oninput = debounce(() => {
     State.params.q = State.params.q || {};
@@ -1268,9 +1274,6 @@ async function boot() {
   $("#boot").remove();
   $("#layout").hidden = false;
 
-  // Selector de modelos: se pinta al abrir Configuracion y se recarga solo
-  // cada vez que se cambia de proveedor.
-  if (State.route === "settings") initSelectorModelos();
 
   $("#globalSearch").addEventListener("input", debounce(function () {
     State.params.q = State.params.q || {};

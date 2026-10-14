@@ -221,7 +221,14 @@ check("version coherente", d.get("version") == ping_version, str(d.get("version"
 
 print("\n=== 10. Actualizaciones ===")
 s, d = call("GET", "/api/update/check")
-check("endpoint check", s == 200 and d.get("ok") is True, str(d)[:150])
+# GitHub limita las peticiones anonimas (60/hora). Si esta limitado, la app
+# debe responder con un error claro: eso tambien es el comportamiento correcto.
+limitado = "403" in (d.get("error") or "") or "rate" in (d.get("error") or "").lower()
+check("endpoint check responde", s == 200 and (d.get("ok") is True or limitado), str(d)[:120])
+if limitado:
+    print("        (GitHub limita las peticiones anonimas: se omite la comprobacion remota)")
+else:
+    check("comprobacion remota correcta", d.get("ok") is True, str(d)[:120])
 check("compara versiones", d.get("actual") == ping_version, str(d.get("actual")))
 if d.get("ok"):
     check("informa ultima version", bool(d.get("ultima")), str(d.get("ultima")))

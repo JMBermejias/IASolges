@@ -102,6 +102,22 @@ if ! curl -sf "http://127.0.0.1:${PUERTO_TEST}/api/ping" >/dev/null 2>&1; then
 fi
 python3 tests/test_api.py "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 node tests/test_views.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+
+# Prueba de interfaz con DOM real (opcional: necesita jsdom).
+if node -e "require('jsdom')" >/dev/null 2>&1; then
+    echo "  Ejecutando prueba de DOM (jsdom)..."
+    node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+else
+    CACHE_JS="${TMPDIR:-/tmp}/iasolges-jsdom"
+    echo "  Instalando jsdom en $CACHE_JS para la prueba de DOM..."
+    mkdir -p "$CACHE_JS"
+    ( cd "$CACHE_JS" && npm install jsdom --silent --no-audit --no-fund >/dev/null 2>&1 ) || true
+    if [ -d "$CACHE_JS/node_modules/jsdom" ]; then
+        NODE_PATH="$CACHE_JS/node_modules" node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    else
+        echo "  AVISO: no se pudo instalar jsdom; se omite la prueba de DOM."
+    fi
+fi
 PID_TEST="$(ss -lptn "sport = :${PUERTO_TEST}" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)"
 [ -n "$PID_TEST" ] && kill "$PID_TEST" 2>/dev/null || true
 rm -rf /tmp/iasolges-test-data

@@ -104,3 +104,8 @@ Anade OpenCode como proveedor de IA con su catalogo de 8 modelos (Space Bunny Fr
 
 Arregla la carga de modelos en Configuracion. El selector era un campo de texto con datalist, que WebKit no despliega en la ventana nativa: ahora es un select real que se rellena solo y se recarga al cambiar de proveedor. Anade listas de modelos sugeridos por proveedor (OpenAI, Anthropic, DeepSeek, Ollama, OpenCode y Motor IA Local) para que siempre haya opciones aunque el catalogo remoto falle por falta de clave, mas un campo para escribir el identificador a mano.
 
+
+## [1.3.2] - 2026-10-14
+
+Arregla el selector de modelos, que se quedaba vacio al navegar a Configuracion. Solo se rellenaba en el arranque de la aplicacion, nunca despues de navegar a la vista, asi que el desplegable llegaba sin opciones. Se inicializa ahora en afterRender, con cada entrada a la vista. Anade tests/test_dom.mjs: prueba de interfaz con DOM real que reproduce el flujo del usuario (arrancar en Inicio y pulsar en Configuracion) y comprueba que el selector trae modelos y que se recarga al cambiar de proveedor.
+
