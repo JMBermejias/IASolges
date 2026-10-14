@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="azul">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IASolges</title>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<div id="boot" class="boot"><div class="boot-logo">IA</div><p>Cargando IASolges...</p></div>
+
+<div class="layout" id="layout" hidden>
+
+  <!-- ======================= BARRA LATERAL ======================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">IA</div>
+      <div class="brand-text">
+        <strong>IASolges</strong>
+        <span id="brandVer">v1.0.0</span>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav"><!-- inyectado por JS --></nav>
+
+    <div class="sidebar-foot">
+      <button class="side-item" data-route="settings">
+        <span class="side-ico" data-icon="settings"></span>
+        <span class="side-label">Configuracion</span>
+      </button>
+      <div class="engine" id="engineBox" title="Motor de IA activo">
+        <span class="dot"></span><span id="engineName">Motor IA Local</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================= AREA PRINCIPAL ======================= -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn only-mobile" id="btnMenu" title="Menu"><span data-icon="menu"></span></button>
+      <div class="topbar-title">
+        <h1 id="pageTitle">Inicio</h1>
+        <p id="pageSub">Panel de control</p>
+      </div>
+      <div class="topbar-actions">
+        <label class="search">
+          <span data-icon="search"></span>
+          <input type="search" id="globalSearch" placeholder="Buscar en el modulo..." autocomplete="off">
+        </label>
+        <button class="icon-btn" id="btnTheme" title="Cambiar tema"><span data-icon="sun"></span></button>
+        <button class="btn btn-primary" id="btnQuickAI"><span data-icon="sparkles"></span> Generar con IA</button>
+      </div>
+    </header>
+
+    <section class="content" id="view"><!-- inyectado por JS --></section>
+  </main>
+</div>
+
+<!-- ======================= MODAL ======================= -->
+<div class="modal-root" id="modalRoot" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal" role="dialog" aria-modal="true">
+    <header class="modal-head">
+      <h2 id="modalTitle">Titulo</h2>
+      <button class="icon-btn" data-close title="Cerrar"><span data-icon="x"></span></button>
+    </header>
+    <div class="modal-body" id="modalBody"></div>
+    <footer class="modal-foot" id="modalFoot"></footer>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="/js/core.js"></script>
+<script src="/js/views.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

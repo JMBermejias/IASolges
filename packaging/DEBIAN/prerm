@@ -1,0 +1,18 @@
+#!/bin/sh
+# prerm de IASolges
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        # Aviso al usuario: sus datos siguen en ~/.local/share/iasolges
+        if [ -d "$HOME/.local/share/iasolges" ]; then
+            echo ""
+            echo "  Tus datos de IASolges se conservan en:"
+            echo "    $HOME/.local/share/iasolges"
+            echo "  Para borrarlos tambien:  sudo apt purge iasolges"
+            echo ""
+        fi
+        ;;
+esac
+
+exit 0

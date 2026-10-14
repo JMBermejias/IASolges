@@ -1,0 +1,81 @@
+name: Construir paquete .deb
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Construir .deb
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Obtener codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 python3-pil build-essential fakeroot desktop-file-utils
+
+      - name: Verificar sintaxis Python
+        run: python3 -m compileall -q src/iasolges
+
+      - name: Verificar sintaxis JavaScript
+        run: |
+          for f in src/iasolges/static/js/*.js; do node --check "$f"; done
+
+      - name: Validar .desktop
+        run: desktop-file-validate packaging/iasolges.desktop
+
+      - name: Generar iconos
+        run: python3 scripts/make_icons.py packaging/icons
+
+      - name: Ejecutar pruebas de API
+        run: |
+          python3 src/iasolges --port=8791 --no-browser &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8791/api/ping && break
+            sleep 1
+          done
+          python3 tests/test_api.py http://127.0.0.1:8791
+
+      - name: Ejecutar pruebas de vistas
+        run: node tests/test_views.mjs http://127.0.0.1:8791
+
+      - name: Construir paquete
+        run: ./scripts/build_deb.sh
+
+      - name: Publicar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: iasolges-deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: Crear GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+          generate_release_notes: true
+          body: |
+            ## IASolges ${{ github.ref_name }}
+
+            ### Instalación en Zorin OS / Ubuntu / Debian
+
+            ```bash
+            sudo apt install ./iasolges-*.deb
+            ```
+
+            Después abre **IASolges** desde el menú de aplicaciones
+            o ejecuta `iasolges` en la terminal.
+
+            ### Dependencias
+
+            Solo `python3` (>= 3.8). No requiere pip, ni npm, ni build.

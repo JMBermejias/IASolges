@@ -1,0 +1,25 @@
+#!/bin/sh
+# Lanzador de IASolges instalado como paquete del sistema.
+set -e
+
+APPDIR="/opt/iasolges"
+
+if [ ! -d "$APPDIR/iasolges" ]; then
+    echo "IASolges: instalacion incompleta (falta $APPDIR)." >&2
+    echo "Vuelve a instalar el paquete: sudo apt install --reinstall iasolges" >&2
+    exit 1
+fi
+
+PY=""
+for c in python3 /usr/bin/python3 python; do
+    if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+done
+if [ -z "$PY" ]; then
+    echo "IASolges: no se encontro Python 3." >&2
+    echo "Instala las dependencias: sudo apt install python3" >&2
+    exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1
+export PYTHONDONTWRITEBYTECODE
+exec "$PY" "$APPDIR/run.py" "$@"

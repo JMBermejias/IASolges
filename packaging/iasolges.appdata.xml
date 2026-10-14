@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>iasolges.desktop</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>IASolges</name>
+  <summary>Plataforma de IA para gestion comercial</summary>
+  <description>
+    <p>
+      IASolges es una plataforma de escritorio con inteligencia artificial integrada para
+      gestionar clientes, contactos, campanas y propuestas comerciales, y para generar de
+      forma automatica programas personalizados a partir de los parametros del negocio.
+    </p>
+    <p>Modulos incluidos:</p>
+    <ul>
+      <li>Plataforma: Inicio, Mi Trabajo, Clientes, Contactos, Campanas, Favoritos</li>
+      <li>Flujo de Trabajo: Mapa Localizador de Clientes, Generador de Prompts, Chequeo de Seguridad, Precios, Prospectores</li>
+      <li>Adicionales: Nombres, Kit de Marca, Analizador, Presupuestos</li>
+    </ul>
+    <p>
+      Funciona sin conexion mediante un motor de IA local integrado. Si se configura una clave
+      de OpenAI, OpenRouter, DeepSeek, Anthropic u Ollama, delega automaticamente en ese
+      proveedor y vuelve al motor local si falla.
+    </p>
+    <p>Todos los datos se guardan localmente en SQLite.</p>
+  </description>
+  <launchable type="desktop-id">iasolges.desktop</launchable>
+  <url type="homepage">https://github.com/JMBermejias/IASolges</url>
+  <url type="bugtracker">https://github.com/JMBermejias/IASolges/issues</url>
+  <categories>
+    <category>Office</category>
+    <category>Business</category>
+  </categories>
+  <provides>
+    <binary>iasolges</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+</component>

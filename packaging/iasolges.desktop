@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=IASolges
+GenericName=Plataforma de IA para gestion comercial
+Comment=Gestion comercial, marketing y generacion automatica de programas con IA
+Exec=iasolges %U
+Icon=iasolges
+Terminal=false
+StartupNotify=true
+StartupWMClass=iasolges
+Categories=Office;Finance;
+Keywords=IA;inteligencia artificial;clientes;contactos;ventas;CRM;marketing;campanas;presupuestos;marca;prospectos;automatizacion;
