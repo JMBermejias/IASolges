@@ -189,19 +189,35 @@ VIEWS["inicio"] = async function () {
     <div class="cards mb">${cardHtml(g)}</div>`).join("")}
 
   <div class="grid2">
-    <div class="panel"><div class="panel-head"><h3>${icon("clock")} Actividad reciente</h3></div>
+    <div class="panel"><div class="panel-head">
+      <h3>${icon("clock")} Actividad reciente</h3>
+      ${limpiarBtn("activity", (d.activity || []).length)}
+      <button class="mini" data-act="view" data-nav2="mi-trabajo" title="Ver todo">${icon("chevron")}</button>
+    </div>
       <div class="panel-body"><div class="feed">${feed}</div></div></div>
-    <div class="panel"><div class="panel-head"><h3>${icon("briefcase")} Trabajos recientes</h3></div>
+    <div class="panel"><div class="panel-head">
+      <h3>${icon("briefcase")} Trabajos recientes</h3>
+      ${limpiarBtn("works", (d.recent_works || []).length, d.trabajos)}
+    </div>
       <div class="panel-body"><div class="feed">${works}</div></div></div>
   </div>
 
-  <div class="panel mt"><div class="panel-head"><h3>${icon("trending")} Crecimiento de registros</h3>
-    <span class="badge b-info">Motor: ${esc(ai.label || "local")}</span></div>
+  <div class="panel mt"><div class="panel-head">
+    <h3>${icon("trending")} Crecimiento de registros</h3>
+    <span class="badge b-info">Motor: ${esc(ai.label || "local")}</span>
+    ${limpiarBtn("chart", 0, 0, "Restablecer")}
+  </div>
     <div class="panel-body">${bars || '<p class="muted tiny">Sin datos suficientes todavia.</p>'}</div></div>`;
 };
 function moduleIcon(m) {
   const f = NAV.flatMap(n => n.items).find(i => i.module === m);
   return f ? f.icon : "info";
+}
+
+/** Boton de limpieza de un panel del inicio. */
+function limpiarBtn(target, visibles, total, etiqueta) {
+  return `<button class="mini clean" data-act="limpiar" data-target="${target}"
+    title="${esc(etiqueta || "Limpiar panel")}">${icon("eraser")}</button>`;
 }
 
 /* ------------------------------------------------------------ MI TRABAJO */

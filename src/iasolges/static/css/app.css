@@ -451,3 +451,12 @@ tr:hover .row-actions{opacity:1}
 .upd-status.warn svg{stroke:#C08A6E}
 .upd-status.err svg{stroke:#A46161}
 .upd-status b{font-weight:650}
+
+/* Boton de limpieza de los paneles del inicio */
+.mini.clean{color:var(--txt-3)}
+.mini.clean:hover{background:#A46161;border-color:#A46161;color:#fff}
+.mini.clean svg{width:13px;height:13px}
+.panel-head .mini{flex:0 0 28px}
+.panel-head .mini.clean{opacity:.55}
+.panel-head .mini.clean:hover{opacity:1}
+.panel-head:hover .mini.clean{opacity:1}

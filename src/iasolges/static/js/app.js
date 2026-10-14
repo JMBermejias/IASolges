@@ -725,6 +725,7 @@ function wireEvents() {
         toast("CSV exportado", "ok"); break;
       }
       case "quickai": openGenerator(); break;
+      case "limpiar": confirmarLimpieza(act.dataset.target); break;
       case "seed":
         try {
           const r = await Api.post("/api/seed-demo", {});
@@ -1043,6 +1044,73 @@ AUTORES O TITULARES DEL COPYRIGHT SERAN RESPONSABLES DE NINGUNA RECLAMACION,
 DAÑOS U OTRAS RESPONSABILIDADES, YA SEA EN UNA ACCION CONTRACTUAL, AGRAVIO O
 CUALQUIER OTRO MOTIVO, DERIVADAS DE, FUERA DE O EN CONEXION CON EL SOFTWARE O SU
 USO U OTRO TIPO DE ACCIONES EN EL SOFTWARE.`;
+
+/* ------------------------------------------------------------ LIMPIEZA DE PANELES */
+const LIMPIEZA = {
+  activity: {
+    titulo: "Limpiar actividad reciente",
+    icono: "clock",
+    cuerpo: "Se borraran todos los registros del historial de actividad del panel de inicio.",
+    aviso: "Es solo un registro de acciones: no afecta a clientes, contactos ni ningun dato de negocio.",
+    boton: "Vaciar actividad",
+    peligro: false,
+  },
+  works: {
+    titulo: "Limpiar trabajos recientes",
+    icono: "briefcase",
+    cuerpo: "Se eliminaran TODOS los trabajos de Mi Trabajo.",
+    aviso: "Esto borra datos reales y no se puede deshacer. Descarga lo que necesites antes de continuar.",
+    boton: "Eliminar trabajos",
+    peligro: true,
+  },
+  chart: {
+    titulo: "Reiniciar grafico de crecimiento",
+    icono: "trending",
+    cuerpo: "El grafico pasara a mostrar solo el mes actual.",
+    aviso: "No se borra ningun registro: solo cambia la ventana de tiempo que se representa.",
+    boton: "Reiniciar grafico",
+    peligro: false,
+  },
+};
+
+async function confirmarLimpieza(target) {
+  const c = LIMPIEZA[target];
+  if (!c) return;
+  // Cuantas filas hay ahora mismo, para decirlo con numeros.
+  let avisoExtra = "";
+  try {
+    const d = await Api.get("/api/dashboard");
+    if (target === "activity") avisoExtra = `Hay ${(d.activity || []).length} entradas visibles.`;
+    if (target === "works") avisoExtra = `Hay ${d.trabajos || 0} trabajos registrados.`;
+  } catch (e) { /* seguimos sin el dato */ }
+
+  Modal.open(c.titulo, `
+    <div class="upd-status ${c.peligro ? "warn" : ""}">${icon(c.icono)}<div><b>${esc(c.cuerpo)}</b>
+      ${avisoExtra ? `<div class="muted tiny">${esc(avisoExtra)}</div>` : ""}</div></div>
+    <p class="tiny muted">${esc(c.aviso)}</p>`,
+    `<button class="btn btn-ghost left" data-close>Cancelar</button>
+     <button class="btn ${c.peligro ? "btn-danger" : "btn-primary"}" id="btnDoClear">
+       ${icon("eraser")} ${esc(c.boton)}</button>`, true);
+
+  $("#btnDoClear").onclick = async () => {
+    const b = $("#btnDoClear"); b.disabled = true;
+    b.innerHTML = '<span class="spin"></span> Limpiando...';
+    try {
+      const r = await Api.post("/api/dashboard/clear", { target });
+      if (r.ok) {
+        Modal.close();
+        toast(r.mensaje, "ok");
+        go("inicio", {});
+      } else {
+        toast(r.error || "No se pudo limpiar", "err");
+      }
+    } catch (e) {
+      toast(e.message, "err");
+    }
+    b.disabled = false;
+    b.innerHTML = icon("eraser") + " " + c.boton;
+  };
+}
 
 /* ------------------------------------------------------------ BOOT */
 async function boot() {

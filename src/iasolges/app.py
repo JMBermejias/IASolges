@@ -90,14 +90,16 @@ class Api:
 
     def _chart(self):
         conn = db.get_conn(self.db)
+        meses = max(1, min(24, _i(db.get_setting(self.db, "chart_months", "6"), 6)))
         out = {}
-        for t, label in (("clients", "Clientes"), ("contacts", "Contactos"),
-                         ("campaigns", "Campanas"), ("quotes", "Presupuestos"),
-                         ("works", "Trabajos"), ("prospects", "Prospectos")):
-            rows = conn.execute(
-                f"SELECT substr(COALESCE(created_at,'2026-01-01'),1,7) m, COUNT(*) c "
-                f"FROM {t} GROUP BY m ORDER BY m DESC LIMIT 6").fetchall()
-            out[t] = [{"month": r["m"], "count": r["c"]} for r in rows][::-1]
+        with db._db_lock:
+            for t, label in (("clients", "Clientes"), ("contacts", "Contactos"),
+                             ("campaigns", "Campanas"), ("quotes", "Presupuestos"),
+                             ("works", "Trabajos"), ("prospects", "Prospectos")):
+                rows = conn.execute(
+                    f"SELECT substr(COALESCE(created_at,'2026-01-01'),1,7) m, COUNT(*) c "
+                    f"FROM {t} GROUP BY m ORDER BY m DESC LIMIT ?", (meses,)).fetchall()
+                out[t] = [{"month": r["m"], "count": r["c"]} for r in rows][::-1]
         return out
 
     # ---- CRUD generico
@@ -452,6 +454,45 @@ class Api:
         except upd.UpdateError as e:
             return {"ok": False, "error": str(e)}
 
+    # ---- limpieza de paneles del inicio
+    def limpiar_panel(self, target):
+        """
+        target:
+          activity -> vacia el registro de actividad (es un log, no datos de negocio)
+          works    -> elimina los registros de Mi Trabajo
+          chart    -> reinicia la ventana del grafico de crecimiento (no borra datos)
+        """
+        conn = db.get_conn(self.db)
+        if target == "activity":
+            with db._db_lock:
+                n = conn.execute("SELECT COUNT(*) c FROM activity").fetchone()["c"]
+                conn.execute("DELETE FROM activity")
+                conn.commit()
+            db.log_activity(self.db, "inicio", "limpiado", f"actividad vaciada ({n})")
+            return {"ok": True, "target": target, "eliminados": n,
+                    "mensaje": f"Se han borrado {n} registros de actividad."}
+
+        if target == "works":
+            with db._db_lock:
+                n = conn.execute("SELECT COUNT(*) c FROM works").fetchone()["c"]
+                conn.execute("DELETE FROM works")
+                conn.commit()
+            db.log_activity(self.db, "inicio", "limpiado", f"trabajos eliminados ({n})")
+            return {"ok": True, "target": target, "eliminados": n,
+                    "mensaje": f"Se han eliminado {n} trabajos."}
+
+        if target == "chart":
+            db.set_setting(self.db, "chart_months", "1")
+            return {"ok": True, "target": target, "eliminados": 0,
+                    "mensaje": "Grafico reiniciado: solo muestra el mes actual. "
+                               "No se ha borrado ningun registro."}
+
+        return {"ok": False, "error": f"Panel desconocido: {target}"}
+
+    def restaurar_chart(self):
+        db.set_setting(self.db, "chart_months", "6")
+        return {"ok": True, "mensaje": "Grafico restaurado a los ultimos 6 meses."}
+
     # ---- ficha del autor
     def creditos(self, q):
         s = db.all_settings(self.db)
@@ -672,6 +713,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "version": VERSION, "ai": ai.provider_info(a.db)})
         if parts[0] == "credits":
             return self._json(a.creditos(q))
+        if parts[0] == "dashboard":
+            if parts[1:2] == ["clear"] and method == "POST":
+                return self._json(a.limpiar_panel((self._body() or {}).get("target", "")))
+            if parts[1:2] == ["restore-chart"] and method == "POST":
+                return self._json(a.restaurar_chart())
         if parts[0] == "update":
             if parts[1:2] == ["check"] and method == "GET":
                 return self._json(a.update_check(q))

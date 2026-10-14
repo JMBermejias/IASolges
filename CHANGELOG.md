@@ -84,3 +84,8 @@ Reduce el tamano de los iconos y las tarjetas del panel de inicio: iconos de 38p
 
 Arregla los iconos enormes de los encabezados de panel (Actividad reciente, Trabajos recientes, Crecimiento de registros) y hace que la ventana arranque maximizada. La causa era que icon() genera los SVG sin width/height y no existia ninguna regla CSS que los limitara, por lo que el navegador los pintaba al tamano por defecto (300x150). Se anade la regla global svg{width:1em} como red de seguridad y una regla explicita para los encabezados de panel.
 
+
+## [1.2.3] - 2026-10-14
+
+Anade boton de limpieza en los tres paneles del inicio. Actividad reciente vacia el registro de acciones (log, no afecta a datos de negocio); Trabajos recientes elimina los registros de Mi Trabajo con confirmacion y aviso de que no se puede deshacer; Crecimiento de registros reinicia la ventana temporal del grafico sin borrar ningun dato, con opcion de restaurarlo a 6 meses. Cada limpieza pide confirmacion indicando cuantos registros hay.
+

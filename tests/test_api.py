@@ -272,7 +272,54 @@ for cont in (".card-ico svg", ".panel-head h3 svg", ".kpi .k-ico svg", ".btn svg
     ok_size = bool(re.search(re.escape(cont) + r"\s*\{[^}]*width:\s*\d", css))
     check(f"CSS: {cont} con tamaño", ok_size)
 
-print("\n=== 12. Borrado ===")
+print("\n=== 12. Limpieza de paneles del inicio ===")
+call("POST", "/api/works", {"title": "Trabajo limpieza", "type": "web"})
+call("POST", "/api/works", {"title": "Trabajo limpieza 2", "type": "web"})
+s, d = call("GET", "/api/dashboard")
+check("dashboard tiene actividad", len(d.get("activity", [])) > 0, str(len(d.get("activity", []))))
+check("dashboard cuenta trabajos", d.get("trabajos", 0) >= 2, str(d.get("trabajos")))
+
+# 1) actividad: borra el log, NO los datos de negocio
+s, r = call("POST", "/api/dashboard/clear", {"target": "activity"})
+check("limpiar actividad ok", s == 200 and r.get("ok") is True, str(r)[:120])
+check("actividad informa cuantos", r.get("eliminados", 0) > 0, str(r.get("eliminados")))
+s, d = call("GET", "/api/dashboard")
+check("actividad vaciada", len(d.get("activity", [])) <= 1, str(len(d.get("activity", []))))
+check("limpiar actividad NO borra clientes", d.get("clientes", 0) >= 6, str(d.get("clientes")))
+check("limpiar actividad NO borra trabajos", d.get("trabajos", 0) >= 2, str(d.get("trabajos")))
+
+# 2) grafico: reinicia la ventana temporal, NO borra registros
+s, r = call("POST", "/api/dashboard/clear", {"target": "chart"})
+check("reiniciar grafico ok", s == 200 and r.get("ok") is True, str(r)[:120])
+check("reiniciar grafico no elimina nada", r.get("eliminados") == 0, str(r.get("eliminados")))
+s, d = call("GET", "/api/dashboard")
+check("reiniciar grafico conserva clientes", d.get("clientes", 0) >= 6, str(d.get("clientes")))
+check("reiniciar grafico conserva contactos", d.get("contactos", 0) >= 6, str(d.get("contactos")))
+s, r = call("POST", "/api/dashboard/restore-chart", {})
+check("restaurar grafico ok", s == 200 and r.get("ok") is True, str(r)[:120])
+s, d = call("GET", "/api/dashboard")
+check("grafico con datos tras restaurar",
+      any(len(v) >= 1 for v in d.get("chart", {}).values()), str(d.get("chart"))[:70])
+
+# 3) trabajos: si borra datos reales
+s, before = call("GET", "/api/dashboard")
+n_antes = before.get("trabajos", 0)
+s, r = call("POST", "/api/dashboard/clear", {"target": "works"})
+check("limpiar trabajos ok", s == 200 and r.get("ok") is True, str(r)[:120])
+check("limpiar trabajos borra todos", r.get("eliminados", 0) >= n_antes, str(r.get("eliminados")))
+s, d = call("GET", "/api/dashboard")
+check("trabajos a cero", d.get("trabajos") == 0, str(d.get("trabajos")))
+check("limpiar trabajos NO borra clientes", d.get("clientes", 0) >= 6, str(d.get("clientes")))
+
+# 4) target invalido
+s, r = call("POST", "/api/dashboard/clear", {"target": "../../etc/passwd"})
+check("target invalido rechazado", s == 200 and r.get("ok") is False, str(r)[:120])
+
+# 5) los tres botones existen en el panel de inicio
+s, d = call("GET", "/api/dashboard")
+call("POST", "/api/seed-demo", {})
+
+print("\n=== 13. Borrado ===")
 for m in modules:
     s, _ = call("DELETE", f"/api/{m}/{ids[m]}")
     check(f"borrar {m}", s == 200)
