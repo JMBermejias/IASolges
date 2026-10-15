@@ -19,6 +19,8 @@ import urllib.error
 import urllib.request
 import webbrowser
 
+from . import osm
+
 from . import app as appmod
 from . import db
 
@@ -188,6 +190,8 @@ def main(argv=None):
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
         db_path = os.path.join(data_dir, "iasolges.db")
+        # La cache de datos reales de OpenStreetMap va junto a la base de datos.
+        osm.fijar_cache(os.path.join(data_dir, "cache"))
     else:
         db_path = resolver_db(app_dir)
 

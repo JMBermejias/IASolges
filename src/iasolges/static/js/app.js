@@ -92,6 +92,7 @@ function afterRender(route) {
   }
 
   if (route === "mapa") {
+    Geo.cargarTipos();
     // Sin esto, al abrir una busqueda guardada el mapa salia dibujado pero
     // Geo.resultados seguia vacio: no habia seleccion ni detalle, y el boton
     // "Analizar seleccion con IA" se quejaba de que no havia nada elegido.
@@ -919,6 +920,57 @@ const Geo = {
   resultados: [],
   seleccion: new Set(),
 
+  /** Rellena "Tipo de negocio" segun el sector, y lo refresca al cambiar. */
+  async cargarTipos() {
+    const selSec = $("#geoForm [name=sector]");
+    const selTipo = $("#geoForm [name=business_type]");
+    if (!selSec || !selTipo) return;
+    const elegido = selTipo.value;
+    selTipo.onchange = null;
+    try {
+      selSec.onchange = async () => {
+        selTipo.innerHTML = "";
+        const base = TIPOS_MAPA[selSec.value] || TIPOS_MAPA.general;
+        base.forEach(([v, t]) => {
+          const o = document.createElement("option");
+          o.value = v; o.textContent = t;
+          selTipo.appendChild(o);
+        });
+        await Geo.ampliarTipos();
+      };
+      // Tipos reales de la zona, si el sector tiene resultados en el mapa.
+      await Geo.ampliarTipos(elegido);
+    } catch (e) {
+      console.warn("tipos de negocio", e);
+    }
+  },
+
+  /** Anade al desplegable los tipos que el servidor encuentra de verdad. */
+  async ampliarTipos(mantener) {
+    const selTipo = $("#geoForm [name=business_type]");
+    const loc = ($("#geoForm [name=location]") || {}).value;
+    const sec = ($("#geoForm [name=sector]") || {}).value;
+    if (!selTipo || !loc || !sec) return;
+    let tipos = [];
+    try { tipos = (await Api.get(`/api/geo/tipos?sector=${encodeURIComponent(sec)}&location=${encodeURIComponent(loc)}`)).tipos || []; }
+    catch (e) { return; }
+    if (!tipos.length) return;
+    const actuales = Array.from(selTipo.options).map(o => o.value);
+    const nuevos = tipos.filter(t => !actuales.includes(t) && t);
+    if (!nuevos.length) return;
+    const sep = document.createElement("optgroup");
+    sep.label = "Detectados en la zona";
+    nuevos.forEach(t => {
+      const o = document.createElement("option");
+      o.value = t; o.textContent = t;
+      sep.appendChild(o);
+    });
+    selTipo.appendChild(sep);
+    if (mantener) selTipo.value = mantener;
+    else if (actuales[0] === "") selTipo.value = "";
+  },
+
+
   montar(res) {
     Geo.resultados = res || [];
     Geo.seleccion = new Set();
@@ -1149,10 +1201,12 @@ document.addEventListener("submit", async (e) => {
     try {
       const r = await Api.post("/api/ai/geo", d);
       $("#geoResult").innerHTML = mapHtml({ location: r.location, radius: r.radius,
-        sector: r.sector, results: r.results, analysis: r.analysis });
+        sector: r.sector, results: r.results, analysis: r.analysis,
+        center: r.center, real: r.real, fuente: r.fuente });
       GeoPendiente = { id: r.record && r.record.id, results: r.results, analysis: r.analysis || "" };
       Geo.montar(r.results);
-      toast(r.results.length + " oportunidades encontradas", "ok");
+      toast(r.results.length + (r.real ? " negocios reales" : " oportunidades de muestra")
+            + " en " + r.location, r.real ? "ok" : "warn");
     } catch (er) {
       $("#geoResult").innerHTML = empty("alert", "Error", er.message);
     }

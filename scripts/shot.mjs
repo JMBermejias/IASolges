@@ -48,7 +48,11 @@ const style = d.createElement("style");
 style.textContent = CSS;
 d.head.appendChild(style);
 d.body.setAttribute("data-frozen", "1");
-fs.writeFileSync(out, "<!doctype html>\n" + d.documentElement.outerHTML);
+// La instantanea se guarda en un fichero local, asi que las rutas relativas
+// /api/... no resolverian: se pasan a absolutas contra el servidor en marcha.
+let doc2 = d.documentElement.outerHTML;
+doc2 = doc2.split('"/api/').join('"' + BASE + '/api/');
+fs.writeFileSync(out, "<!doctype html>\n" + doc2);
 console.log("escrita " + out);
 window.close();
 process.exit(0);

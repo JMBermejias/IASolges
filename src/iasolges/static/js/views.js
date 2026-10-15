@@ -410,7 +410,51 @@ VIEWS["favoritos"] = async function () {
 /** Resultados de la busqueda abierta: los necesita afterRender para montar el mapa. */
 let GeoPendiente = null;
 
+/* Etiquetas legibles de cada sector en el desplegable. */
+const ETIQUETA_SECTOR = {
+  general: "Cualquier sector", tecnologia: "Tecnologia y software", salud: "Salud y clinics",
+  legal: "Legal y gestorias", construccion: "Construccion y reformas",
+  ecommerce: "Comercio electronico", educacion: "Educacion y formacion",
+  hosteleria: "Hosteleria y restauracion", servicios: "Servicios profesionales",
+  agricultura: "Agricultura", industrial: "Industria y almacen",
+};
+
+/* Actividades que se ofrecen en "Tipo de negocio", por sector. Se combina con
+   las que devuelve el servidor para que nunca se vea vacio. */
+const TIPOS_MAPA = {
+  general: [["", "Todos los tipos"], ["Centro", "Centros y servicios"], ["Comercio", "Comercio"],
+            ["Oficina", "Oficinas y gestion"], ["Restaurante", "Restaurantes y cafeterias"]],
+  tecnologia: [["", "Todos los tipos"], ["Consultoria IT", "Consultoria IT"],
+               ["Software", "Software y aplicaciones"], ["Telecomunicaciones", "Telecomunicaciones"],
+               ["Informatic", "Servicios informaticos"]],
+  salud: [["", "Todos los tipos"], ["Centro de salud", "Centros de salud"],
+          ["Clinica", "Clinicas"], ["Fisioterapia", "Fisioterapia"],
+          ["Dental", "Clinicas dentales"], ["Farmacia", "Farmacias"],
+          ["Laboratorio clinico", "Laboratorios clinicos"], ["Residencia", "Residencias"]],
+  legal: [["", "Todos los tipos"], ["Despacho de abogados", "Despachos de abogados"],
+          ["Asesoria fiscal", "Asesorias fiscales"], ["Gestoria", "Gestorias"], ["Notario", "Notarias"]],
+  construccion: [["", "Todos los tipos"], ["Constructora", "Constructoras"],
+                 ["Reformas", "Empresas de reformas"], ["Inmobiliaria", "Inmobiliarias"],
+                 ["Arquitectos", "Despachos de arquitectura"], ["Ingenieria", "Ingenierias"]],
+  ecommerce: [["", "Todos los tipos"], ["Comercio electronico", "Comercio electronico"],
+              ["Tienda online", "Tiendas online"], ["Distribuidor", "Distribuidores"]],
+  educacion: [["", "Todos los tipos"], ["Centro de formacion", "Centros de formacion"],
+              ["Academia", "Academias"], ["Instituto", "Institutos"],
+              ["Escuela de negocios", "Escuelas de negocios"], ["Guarderia", "Guarderias"]],
+  hosteleria: [["", "Todos los tipos"], ["Restaurante", "Restaurantes"], ["Hotel", "Hoteles"],
+               ["Cafe", "Cafeterias"], ["Bar", "Bares"], ["Catering", "Catering"]],
+  servicios: [["", "Todos los tipos"], ["Asesoria", "Asesorias"], ["Gestoria", "Gestorias"],
+              ["Agencia", "Agencias"], ["Seguros", "Seguros"], ["Inmobiliaria", "Inmobiliarias"],
+              ["Peluqueria", "Peluquerias"], ["Fontaneria", "Fontaneria"],
+              ["Lavanderia", "Lavanderias"], ["administracion", "Administracion"]],
+  agricultura: [["", "Todos los tipos"], ["Agricola", "Explotaciones agricolas"],
+                ["Cooperativa", "Cooperativas"], ["Finca", "Fincas"]],
+  industrial: [["", "Todos los tipos"], ["Industrial", "Industrias"],
+               ["Almacen", "Almacenes"], ["Mantenimiento", "Mantenimiento industrial"]],
+};
+
 VIEWS["mapa"] = async function (params) {
+  const sector = (params.sector || "general").toLowerCase();
   const q = params.q || {};
   const rows = await fetchList("geo_searches", { limit: "50" });
   let res = null;
@@ -418,8 +462,11 @@ VIEWS["mapa"] = async function (params) {
   if (params.id) {
     const g = await Api.get("/api/geo_searches/" + params.id);
     try {
+      let centro = null;
+      try { centro = JSON.parse(g.filters || "{}").center || null; } catch (e) {}
       res = { results: JSON.parse(g.results), analysis: g.ai_analysis, location: g.location,
-              radius: g.radius, sector: g.sector, center: null };
+              radius: g.radius, sector: g.sector, center: centro,
+              real: g.fuente ? /OpenStreetMap/i.test(g.fuente) : false, fuente: g.fuente || "" };
       // Guardamos los resultados para que afterRender monte el mapa y la
       // seleccion: sin esto, al reabrir una busqueda guardada los marcadores
       // no respondian y "Analizar seleccion" no tenia nada que enviar.
@@ -434,13 +481,22 @@ VIEWS["mapa"] = async function (params) {
     <div class="panel"><div class="panel-head"><h3>${icon("map")} Parametros de busqueda</h3></div>
       <div class="panel-body"><form class="form" id="geoForm">
         <div class="form-grid">
-          ${field("Localidad *", input("location", "Madrid"), "Ciudad o zona")}
-          ${field("Radio (km)", input("radius", 10, "number", "10", "1"))}
-          ${field("Sector", select("sector", "general", SECTORS.map(s => [s, s])))}
-          ${field("Tipo de negocio", select("business_type", "", [["", "Todos los tipos"]]), "Filtra por actividad")}
+          ${field("Localidad *", input("location", res ? res.location : "Madrid", "text", "Ciudad o zona"))}
+          ${field("Radio (km)", input("radius", res ? res.radius : 10, "number", "10", "1"))}
+          ${field("Sector", select("sector", sector, SECTORS.map(x => [x, ETIQUETA_SECTOR[x] || x])), "", true)}
+          ${field("Tipo de negocio", select("business_type", "", TIPOS_MAPA[sector] || []),
+                  "Se rellena con las actividades reales de la zona")}
           ${field("Numero de resultados", input("limit", 20, "number", "20", "1"))}
         </div>
+        <div class="form-grid">
+          ${field("Origen de los datos", select("origin", "real",
+              [["real", "Reales (OpenStreetMap)"], ["muestra", "Muestra del Motor IA"]]),
+              "Reales trae nombres y direcciones que existen de verdad")}
+        </div>
         <button class="btn btn-primary" type="submit">${icon("search")} Buscar y analizar</button>
+        <p class="tiny muted" id="geoNota" style="margin-top:8px">Con <b>datos reales</b> salen
+          nombres y direcciones que existen de verdad, pero <b>sin teléfono ni correo</b>: hay que
+          buscarlos en la web de cada negocio. Sin conexión se usan datos de muestra.</p>
       </form></div></div>
 
     <div class="panel"><div class="panel-head"><h3>${icon("globe")} Zonas con cobertura</h3></div>
@@ -467,46 +523,105 @@ VIEWS["mapa"] = async function (params) {
       : empty("map", "Sin busquedas", "Realiza tu primera busqueda local para ver oportunidades por zona.")}</div></div>`;
 };
 
+/* ------------------------------------------------------------ MAPA REAL */
+/* Proyeccion Web Mercator: es la misma que usan los tiles de OpenStreetMap,
+   asi los puntos caen justo encima de la calle que les toca. */
+const _merc = (lat, lon, z) => {
+  const n = Math.pow(2, z);
+  const s = Math.sin(Math.max(-85, Math.min(85, lat)) * Math.PI / 180);
+  return {
+    x: (lon + 180) / 360 * n * 256,
+    y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n * 256,
+  };
+};
+
+/* Zoom para que el radio pedido ocupe mas o menos el ancho del mapa. */
+const _zoom = (lat, radioKm) => {
+  const ancho = 1000;
+  const mpp = (2 * Math.max(0.5, radioKm) * 1000) / ancho;
+  const z = Math.log2(156543.03392 * Math.cos(lat * Math.PI / 180) / mpp);
+  return Math.max(9, Math.min(17, Math.round(z)));
+};
+
+/* Tiles del mapa de fondo. Si no hay conexion no cargan y se ve la rejilla. */
+const TILES = (origen, z, W, H) => {
+  const n = Math.pow(2, z);
+  const x0 = Math.floor(origen.x / 256), x1 = Math.floor((origen.x + W) / 256);
+  const y0 = Math.floor(origen.y / 256), y1 = Math.floor((origen.y + H) / 256);
+  const out = [];
+  for (let ty = y0; ty <= y1 && out.length < 80; ty++) {
+    if (ty < 0 || ty >= n) continue;
+    for (let tx = x0; tx <= x1 && out.length < 80; tx++) {
+      const wx = ((tx % n) + n) % n;
+      // Se piden a traves del servidor, no a OpenStreetMap directamente: sus
+      // tiles devuelven 403 a quien no se identifica en la politica de uso.
+      out.push(`<image href="/api/mapa/tile/${z}/${wx}/${ty}.png"
+        x="${tx * 256 - origen.x}" y="${ty * 256 - origen.y}"
+        width="256" height="256" />`);
+    }
+  }
+  return out.join("");
+};
+
 function mapHtml(res) {
   const pts = res.results || [];
   if (!pts.length) return "";
-  const lats = pts.map(p => p.lat), lons = pts.map(p => p.lon);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-  const pad = 0.02;
-  const W = 100, H = 100;
-  const sx = v => ((v - minLat + pad) / ((maxLat - minLat) + pad * 2 || 1)) * W;
-  const sy = v => H - ((v - minLon + pad) / ((maxLon - minLon) + pad * 2 || 1)) * H;
+  const real = res.real !== false;
+  const sinPuntuar = p => !p.score && p.score !== 0;
+  const conPuntos = pts.filter(p => p.score > 0).length;
 
-  const color = sc => (sc >= 80 ? "#5C8C72" : sc >= 60 ? "#6E9CC4" : "#A9BCCC");
-  const r = sc => 0.9 + (sc / 100) * 1.0;
+  // Centro: el que devuelve el servidor, o la media de los puntos.
+  const c = res.center && typeof res.center.lat === "number" ? res.center : null;
+  const centro = c || {
+    lat: pts.reduce((a, p) => a + p.lat, 0) / pts.length,
+    lon: pts.reduce((a, p) => a + p.lon, 0) / pts.length,
+  };
+  const radio = Math.max(0.5, Number(res.radius) || 10);
+  const z = _zoom(centro.lat, radio);
+  const W = 1000, H = 620;
+  const pc = _merc(centro.lat, centro.lon, z);
+  const origen = { x: pc.x - W / 2, y: pc.y - H / 2 };
 
-  // Radio del halo de seleccion, tambien en unidades del viewBox.
-  const R = 2.4;
-  const markers = pts.map((p, i) => `
-    <g class="marker" data-idx="${i}" tabindex="0" role="button"
-       aria-label="${esc(p.name)}">
-      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${R}" fill="${color(p.score)}"
-              fill-opacity=".14" class="halo"/>
-      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r(p.score)}" fill="${color(p.score)}"
-              fill-opacity=".92" stroke="#fff" stroke-width=".45"/>
-      <title>${esc(p.name)} - ${p.score}/100\n${esc(p.address)}</title>
-    </g>`).join("");
+  const color = p => (p.score >= 80 ? "#5C8C72" : p.score >= 60 ? "#6E9CC4"
+                      : p.score > 0 ? "#A9BCCC" : "#8FA3B8");
+  const r = p => (p.score > 0 ? 6 + (p.score / 100) * 6 : 6.5);
+  const R = 15;
+
+  const markers = pts.map((p, i) => {
+    const q = _merc(p.lat, p.lon, z);
+    const cx = q.x - origen.x, cy = q.y - origen.y;
+    const eti = sinPuntuar(p) ? esc(p.name) : `${esc(p.name)} - ${p.score}/100`;
+    return `
+    <g class="marker" data-idx="${i}" tabindex="0" role="button" aria-label="${esc(p.name)}">
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="${color(p)}" fill-opacity=".16" class="halo"/>
+      <circle cx="${cx}" cy="${cy}" r="${r(p)}" fill="${color(p)}" fill-opacity=".94"
+              stroke="#fff" stroke-width="1.6"/>
+      <title>${eti}\n${esc(p.address || "")}</title>
+    </g>`;
+  }).join("");
+
+  const capas = res.sinTiles ? "" : TILES(origen, z, W, H);
 
   return `
   <div class="section-title"><h3>Mapa de resultados</h3><div class="line"></div>
-    <span class="badge b-info">${pts.length} resultados</span>
+    <span class="badge ${real ? "b-ok" : "b-info"}">${pts.length} ${real ? "reales" : "de muestra"}</span>
+    <span class="badge b-info">${esc(res.fuente || (real ? "OpenStreetMap" : "Muestra"))}</span>
     <span class="muted tiny">Pulsa un punto o una fila para ver el detalle</span></div>
 
   <div class="map-wrap mb">
-    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${markers}</svg>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
+      <g class="tiles">${capas}</g>${markers}
+    </svg>
     <div class="map-legend">
+      ${conPuntos ? `
       <div><i style="background:#5C8C72"></i>Alta prioridad (&gt;80)</div>
       <div><i style="background:#6E9CC4"></i>Media (60–80)</div>
       <div><i style="background:#A9BCCC"></i>Baja (&lt;60)</div>
+      <div><i style="background:#8FA3B8"></i>Sin puntuar</div>` : ""}
+      <div><i style="background:#CBD5E1;border:1px solid #94A3B8"></i>Mapa: OpenStreetMap</div>
     </div>
     <div class="map-info"><b>${esc(res.location)}</b> — radio ${res.radius} km<br>
-      <span class="muted tiny">Sector ${esc(res.sector || "general")} · ${pts.length} oportunidades</span></div>
+      <span class="muted tiny">Sector ${esc(res.sector || "general")} · ${pts.length} ${real ? "negocios reales" : "de muestra"}</span></div>
   </div>
 
   <div class="grid2 mb">
@@ -557,16 +672,20 @@ function detalleHtml(p) {
     <div class="flex-between mb">
       <div><b style="font-size:14.5px">${esc(p.name)}</b>
         <div class="muted tiny">${esc(p.business_type || "")}</div></div>
-      <span class="badge ${p.score >= 80 ? "b-ok" : p.score >= 60 ? "b-info" : ""}">${p.score}/100</span>
+      <span class="badge ${p.score >= 80 ? "b-ok" : p.score >= 60 ? "b-info" : ""}">${
+        p.score ? p.score + "/100" : "Sin puntuar"}</span>
     </div>
     <div class="stat-row"><span>Direccion</span><b class="trunc">${esc(p.address)}</b></div>
-    <div class="stat-row"><span>Telefono</span><b>${esc(p.phone)}</b></div>
-    <div class="stat-row"><span>Email</span><b class="trunc">${esc(p.email)}</b></div>
-    <div class="stat-row"><span>Web</span><b class="trunc">${esc(p.website)}</b></div>
-    <div class="stat-row"><span>Tamano</span><b>${esc(p.size)} empleados</b></div>
+    <div class="stat-row"><span>Telefono</span><b>${p.phone ? esc(p.phone) : '<span class="muted">Sin dato publico</span>'}</b></div>
+    <div class="stat-row"><span>Email</span><b class="trunc">${p.email ? esc(p.email) : '<span class="muted">Sin dato publico</span>'}</b></div>
+    <div class="stat-row"><span>Web</span><b>${p.website ? esc(p.website) : '<span class="muted">Sin dato publico</span>'}</b></div>
+    ${p.size ? `<div class="stat-row"><span>Tamano</span><b>${esc(p.size)} empleados</b></div>` : ""}
     <div class="stat-row"><span>Distancia</span><b>${p.distance} km</b></div>
     <div class="stat-row"><span>Coordenadas</span><b class="mono tiny">${p.lat}, ${p.lon}</b></div>
-    <div class="stat-row"><span>Problema detectado</span><b>${esc(p.pain)}</b></div>`;
+    ${p.pain ? `<div class="stat-row"><span>Problema detectado</span><b>${esc(p.pain)}</b></div>` : ""}
+    ${p.real ? `<p class="tiny muted" style="margin-top:10px">Nombre, direccion y ubicacion
+      verificados en <b>OpenStreetMap</b>. El telefono y el correo no son datos publicos:
+      buscalos en la web del negocio antes de escribir.</p>` : ""}`;
 }
 
 /* ------------------------------------------------------------ PROMPTS */

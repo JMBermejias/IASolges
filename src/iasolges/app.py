@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import __version__
-from . import ai, db
+from . import ai, osm, db
 from . import update as upd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -317,6 +317,7 @@ class Api:
             ctx = {"location": data.get("location", "Madrid"), "radius": _i(data.get("radius"), 10),
                    "sector": data.get("sector", "general"),
                    "business_type": data.get("business_type", ""),
+                   "origin": data.get("origin", "real"),
                    "limit": _i(data.get("limit"), 20)}
             res = ai.local_generate("geo", "", ctx)
             # El analisis va aparte: local_generate("geo") devuelve un dict con
@@ -329,7 +330,8 @@ class Api:
             out["record"] = db.create_row(dbp, "geo_searches", {
                 "location": ctx["location"], "radius": ctx["radius"], "sector": ctx["sector"],
                 "business_type": res["results"][0]["business_type"] if res["results"] else "",
-                "filters": json.dumps(ctx, ensure_ascii=False),
+                "filters": json.dumps(dict(ctx, center=res.get("center")), ensure_ascii=False),
+                "fuente": res.get("fuente", ""),
                 "results": json.dumps(res["results"], ensure_ascii=False),
                 "total": res["total"], "ai_analysis": txt})
         elif action == "geo_detail":
@@ -436,6 +438,27 @@ class Api:
         s["providers"] = ai.PROVIDERS
         s["version"] = VERSION
         return s
+
+    def geo_tipos(self, q):
+        """Tipos de negocio reales encontrados en la zona, para el desplegable."""
+        sector = _q(q, "sector", "general")
+        lugar = _q(q, "location", "")
+        try:
+            lista = osm.tipos_disponibles(sector, lugar or None)
+        except Exception:
+            lista = []
+        return {"ok": True, "tipos": lista, "sector": sector}
+
+    def geo_geocode(self, q):
+        """Resuelve el nombre de una localidad a coordenadas reales."""
+        lugar = _q(q, "location", "")
+        if not lugar:
+            return {"ok": False, "error": "Escribe una localidad."}
+        try:
+            lat, lon, nombre = osm.geocodificar(lugar)
+            return {"ok": True, "lat": lat, "lon": lon, "nombre": nombre}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def save_settings(self, data):
         for k, v in data.items():
@@ -784,6 +807,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "version": VERSION, "ai": ai.provider_info(a.db)})
         if parts[0] == "credits":
             return self._json(a.creditos(q))
+        if parts[0] == "mapa" and parts[1:2] == ["tile"] and method == "GET":
+            try:
+                z, x, y = (parts[2], parts[3], os.path.splitext(parts[4])[0])
+                datos, ok = osm.tile(z, x, y)
+            except (ValueError, IndexError):
+                datos, ok = b"", False
+            if not ok:
+                return self._send(404, b"", "image/png")
+            return self._send(200, datos, "image/png",
+                              {"Cache-Control": "public, max-age=604800"})
+        if parts[0] == "geo":
+            if parts[1:2] == ["tipos"] and method == "GET":
+                return self._json(a.geo_tipos(q))
+            if parts[1:2] == ["geocode"] and method == "GET":
+                return self._json(a.geo_geocode(q))
         if parts[0] == "modelos" and method == "GET":
             return self._json(a.modelos(q))
         if parts[0] == "shutdown" and method == "POST":

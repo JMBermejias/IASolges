@@ -945,17 +945,89 @@ TIPOS = {
 GENERIC = ["Empresa de servicios", "Negocio local", "Comercio", "Profesional independiente"]
 
 
+def _texto_geo_real(loc, sector, radius, reales, lat, lon):
+    """Informe para datos reales. A diferencia del de muestra, aqui los nombres
+    y direcciones existen de verdad y lo que falta es el contacto."""
+    sc = _sector_ctx(sector)
+    tipos = {}
+    for r in reales:
+        tipos[r["business_type"]] = tipos.get(r["business_type"], 0) + 1
+    top = sorted(tipos.items(), key=lambda kv: -kv[1])[:5]
+    filas = "\n".join("| %s | %d |" % (k, v) for k, v in top)
+    nearby = min(r["distance"] for r in reales)
+    lejos = max(r["distance"] for r in reales)
+    return f"""# Lectura del mercado: {loc}
+
+**Sector:** {sector} · **Radio:** {radius} km · **Resultados:** {len(reales)}
+**Fuente:** OpenStreetMap (nombres y ubicaciones reales)
+
+## Que hay en la zona
+
+Estos {len(reales)} negocios existen de verdad: el nombre y la direccion estan
+verificados en OpenStreetMap. El mas cercano esta a **{nearby:.1f} km** y el mas
+lejano a **{lejos:.1f} km**.
+
+| Tipo de actividad | Cuántos |
+|---|---|
+{filas}
+
+## Que tienen y que les falta
+
+Lo que **si** tienes de cada uno: nombre, tipo de actividad, direccion exacta y
+coordenadas precisas en el mapa.
+
+Lo que **no** tienes, y hay que completar antes de escribirles:
+
+- **Telefono y correo.** OpenStreetMap es un mapa, no una guia comercial: no los
+  publica. Hay que buscarlos en la web del negocio o en un directorio.
+- **Web propia.** Solo aparece si el negocio la ha declarado en el mapa.
+- **Punto de contacto.** No se sabe quien decide ni cuando cambia de proveedor.
+
+## Orden de trabajo recomendado
+
+1. **Verificar primero** los {min(5, len(reales))} mas cercanos: son los que
+   vas a poder visitar en una misma mañana.
+2. **Buscar el telefono** de esos, uno a uno. Es el trabajo de verdad.
+3. **Anotarlos como cliente** en el modulo Clientes para no perderlos.
+4. **No mandar correos en frío**: sin telefono no hay conversacion.
+
+## Aviso importante
+
+Estos datos son **reales** pero ** incompletos**: viene de una base colaborativa
+de mapas. Un negocio puede haber cerrado, cambiado de nombre o de actividad.
+Confirma siempre antes de desplazarte o de escribir. Metros que decide la venta:
+{_pick(sc["metricas"], 0)} y {_pick(sc["metricas"], 1)}."""
+
+
 def _ll_geo(prompt, ctx):
     loc = (ctx.get("location") or "Madrid").strip()
-    key = next((k for k in ZONAS if k in loc.lower()), "general")
-    base = ZONAS.get(key, ZONAS["madrid"])
-    lat, lon = base
     sector = (ctx.get("sector") or "general").lower()
     tipos = TIPOS.get(sector, GENERIC)
     radius = int(ctx.get("radius") or 10)
     n = int(ctx.get("limit") or 20)
     ftype = (ctx.get("business_type") or "").strip()
     btype = ftype if ftype in tipos else tipos[0]
+
+    # Primero, datos REALES de OpenStreetMap. Los de muestra quedan como
+    # respaldo para cuando no hay conexion o el sector no devuelve nada.
+    if (ctx.get("origin") or "real").lower() != "muestra":
+        try:
+            from . import osm
+            reales, clat, clon = osm.buscar_reales(loc, sector, radius, n, ftype)
+        except Exception:
+            reales = []
+        if reales:
+            return {
+                "location": loc, "radius": radius, "sector": sector,
+                "center": {"lat": clat, "lon": clon},
+                "results": reales, "total": len(reales),
+                "real": True, "fuente": "OpenStreetMap",
+                "analysis": _texto_geo_real(loc, sector, radius, reales, clat, clon),
+            }
+
+    key = next((k for k in ZONAS if k in loc.lower()), "general")
+    base = ZONAS.get(key, ZONAS["madrid"])
+    lat, lon = base
     needs = {"Digitalizacion y automatizacion", "Presupuestos profesionales", "Marketing y captacion",
              "Analisis y diagnostico", "Formacion del equipo"}
     fails = ["presupuestos lentos", "seguimiento manual", "datos dispersos", "sin medicion",
@@ -987,6 +1059,7 @@ def _ll_geo(prompt, ctx):
     return {
         "location": loc, "radius": radius, "sector": sector, "center": {"lat": lat, "lon": lon},
         "results": results, "total": len(results),
+        "real": False, "fuente": "Muestra del Motor IA Local",
         "analysis": (
             f"# Mapa Localizador de Clientes - {loc}\n\n"
             f"**Radio:** {radius} km | **Sector:** {sector} | **Resultados:** {len(results)}\n\n"
