@@ -104,6 +104,8 @@ _cache = {}
 _ultima_llamada = [0.0]
 CACHE_DIR = None          # lo fija el arranque de la aplicacion
 CACHE_TTL = 7 * 24 * 3600
+# Un resultado vacio puede ser un fallo puntual de la red: se cachea menos.
+CACHE_TTL_VACIO = 24 * 3600
 
 
 class OSMError(Exception):
@@ -142,12 +144,22 @@ def _cache_leer(clave):
         return (c[1] if (c and time.time() - c[0] < CACHE_TTL) else None)
     ruta = os.path.join(CACHE_DIR, "osm_%s.json" % clave)
     try:
-        if os.path.exists(ruta) and time.time() - os.path.getmtime(ruta) < CACHE_TTL:
+        if os.path.exists(ruta) and time.time() - os.path.getmtime(ruta) < (
+                CACHE_TTL_VACIO if _vacia(ruta) else CACHE_TTL):
             with open(ruta, encoding="utf-8") as f:
                 return json.load(f)
     except (OSError, ValueError):
         pass
     return None
+
+
+def _vacia(ruta):
+    """True si el fichero de cache guarda una lista vacia."""
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            return json.load(f) == []
+    except (OSError, ValueError):
+        return False
 
 
 def _cache_escribir(clave, valor):
@@ -222,11 +234,12 @@ def buscar_reales(localidad, sector, radio, limite=20, tipo=""):
     limite = max(1, min(60, int(limite or 20)))
     lat, lon, _ = geocodificar(localidad)
 
-    if tipo:
-        rondas = [[tipo.lower()]]
-    else:
-        rondas = [CLAVES_SECTOR.get(sector, CLAVES_SECTOR["general"]),
-                  AMPLIAR.get(sector, []), GENERICOS]
+    # El tipo elegido va primero (es lo que el usuario quiere), pero NO en
+    # exclusiva: si ese termino no esta en el mapa se sigue con el sector y
+    # sus oficios. Antes se quedaba solo con el y daba 0 resultados.
+    rondas = ([[tipo.lower()]] if tipo else []) + [
+        CLAVES_SECTOR.get(sector, CLAVES_SECTOR["general"]),
+        AMPLIAR.get(sector, []), GENERICOS]
 
     vistos = {}
     pedidos = 0

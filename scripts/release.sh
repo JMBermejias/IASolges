@@ -114,6 +114,7 @@ if node -e "require('jsdom')" >/dev/null 2>&1; then
     node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_centro_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 else
     CACHE_JS="${TMPDIR:-/tmp}/iasolges-jsdom"
     echo "  Instalando jsdom en $CACHE_JS para la prueba de DOM..."
@@ -127,6 +128,7 @@ else
     node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_centro_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     else
         echo "  AVISO: no se pudo instalar jsdom; se omite la prueba de DOM."
     fi

@@ -520,3 +520,14 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-
 .geo-aviso.fuerte svg{stroke:#DC2626}
 .geo-aviso p{margin:0 0 6px}
 .geo-aviso p:last-child{margin:0}
+
+/* Perimetro de busqueda sobre el mapa */
+.perimetro{
+  fill:rgba(125,211,252,.10);stroke:#1E90B5;stroke-width:2.2;
+  stroke-dasharray:9 6;vector-effect:non-scaling-stroke;
+}
+.perimetro-nodo{fill:#1E90B5;stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke}
+.map-legend .lg-perimetro{
+  width:14px;height:0;border-top:2px dashed #1E90B5;border-bottom:none;
+  border-radius:0;display:inline-block;vertical-align:middle;margin-right:5px;
+}

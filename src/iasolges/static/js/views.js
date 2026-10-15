@@ -544,12 +544,16 @@ const _merc = (lat, lon, z) => {
   };
 };
 
-/* Zoom para que el radio pedido ocupe mas o menos el ancho del mapa. */
+/* El mapa se mide en pixeles de Web Mercator, igual que los tiles. */
+const MPP = (lat, z) => 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+
+/* Zoom para que el radio pedido QUEPA ENTERO en el mapa: asi el circulo del
+   perimetro se ve completo y se sabe de un vistazo donde empieza y acaba. */
 const _zoom = (lat, radioKm) => {
-  const ancho = 1000;
-  const mpp = (2 * Math.max(0.5, radioKm) * 1000) / ancho;
-  const z = Math.log2(156543.03392 * Math.cos(lat * Math.PI / 180) / mpp);
-  return Math.max(9, Math.min(17, Math.round(z)));
+  const hueco = 620 / 2 - 34;          // mitad del lado corto menos un margen
+  const mpp = (Math.max(0.5, radioKm) * 1000) / hueco;
+  return Math.max(9, Math.min(17, Math.round(Math.log2(156543.03392
+      * Math.cos(lat * Math.PI / 180) / mpp))));
 };
 
 /* Tiles del mapa de fondo. Si no hay conexion no cargan y se ve la rejilla. */
@@ -609,6 +613,13 @@ function mapHtml(res) {
     </g>`;
   }).join("");
 
+  // Perimetro de busqueda: el circulo que marca el radio pedido. Antes no se
+  // veia donde terminaba la zona, y con radio 10 km no se entendia si los
+  // puntos estaban cerca o lejos.
+  const rPx = (radio * 1000) / MPP(centro.lat, z);
+  const perimetro = `
+    <circle class="perimetro" cx="${W / 2}" cy="${H / 2}" r="${rPx.toFixed(1)}"/>
+    <circle class="perimetro-nodo" cx="${(W / 2).toFixed(1)}" cy="${(H / 2).toFixed(1)}" r="5"/>`;
   const capas = res.sinTiles ? "" : TILES(origen, z, W, H);
 
   return `
@@ -619,7 +630,7 @@ function mapHtml(res) {
 
   <div class="map-wrap mb">
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
-      <g class="tiles">${capas}</g>${markers}
+      <g class="tiles">${capas}</g>${perimetro}${markers}
     </svg>
     <div class="map-legend">
       ${conPuntos ? `
@@ -627,9 +638,10 @@ function mapHtml(res) {
       <div><i style="background:#6E9CC4"></i>Media (60–80)</div>
       <div><i style="background:#A9BCCC"></i>Baja (&lt;60)</div>
       <div><i style="background:#8FA3B8"></i>Sin puntuar</div>` : ""}
+      <div><i class="lg-perimetro"></i>Perimetro: ${res.radius} km</div>
       <div><i style="background:#CBD5E1;border:1px solid #94A3B8"></i>Mapa: OpenStreetMap</div>
     </div>
-    <div class="map-info"><b>${esc(res.location)}</b> — radio ${res.radius} km<br>
+    <div class="map-info"><b>${esc(res.location)}</b> — perimetro de <b>${res.radius} km</b><br>
       <span class="muted tiny">Sector ${esc(res.sector || "general")} · ${pts.length} ${real ? "negocios reales" : "de muestra"}</span></div>
   </div>
 

@@ -1041,6 +1041,15 @@ def _ll_geo(prompt, ctx):
     key = next((k for k in ZONAS if k in loc.lower()), "general")
     base = ZONAS.get(key, ZONAS["madrid"])
     lat, lon = base
+    # Aunque no haya negocios reales, el mapa tiene que estar en la localidad
+    # escrita. Antes se caia a la tabla de 8 ciudades y Novelda salia en
+    # Madrid. La geolocalizacion es lo mismo que ya se usa para los datos
+    # reales, asi que no cuesta nada mas.
+    try:
+        from . import osm
+        lat, lon, _nombre = osm.geocodificar(loc)
+    except Exception:
+        pass
     needs = {"Digitalizacion y automatizacion", "Presupuestos profesionales", "Marketing y captacion",
              "Analisis y diagnostico", "Formacion del equipo"}
     fails = ["presupuestos lentos", "seguimiento manual", "datos dispersos", "sin medicion",
