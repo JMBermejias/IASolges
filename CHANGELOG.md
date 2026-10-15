@@ -124,3 +124,8 @@ Arregla el Mapa Localizador: el analisis de mercado mostraba JSON crudo en vez d
 
 Arregla el guardado del modelo y la ortografia. Al elegir un modelo del desplegable y guardar, se conservaba el anterior porque el campo de texto manual siempre sobreescribia la eleccion; ahora solo cuenta si se elige la opcion de escribirlo a mano. Anade indicadores visibles: el modelo en uso aparece al pie de la barra lateral y en Configuracion > Informacion, y el aviso de guardado dice que modelo se ha guardado. Corrige la ortografia de 'campana' por 'campaña' en toda la interfaz.
 
+
+## [1.3.6] - 2026-10-15
+
+Anade el selector de tipo de analisis en Chequeo de Seguridad, que antes no existia y solo se anunciaba en un texto pequeno. Ahora hay dos opciones: 'Automatico con IA' (por defecto, analiza solo 1,5 s despues de escribir) y 'Manual' (espera a que pulses Analizar ahora). El aviso bajo el desplegable indica el modo activo y lo que esta haciendo. El campo Titulo ya no viene con 'Chequeo manual' por defecto. Añade el boton Reanalizar. Corrige dos detalles de la v1.3.5: el icono de informacion salia relleno en negro y el lateral seguia mostrando el texto largo del motor en vez del nombre corto con el modelo debajo.
+

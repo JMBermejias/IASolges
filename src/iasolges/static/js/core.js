@@ -59,7 +59,7 @@ const ICONS = {
 function icon(name, size) {
   const p = ICONS[name] || ICONS.info;
   const s = size ? ` width="${size}" height="${size}"` : "";
-  return `<svg viewBox="0 0 24 24"${s} aria-hidden="true">${p}</svg>`;
+  return `<svg class="ic" viewBox="0 0 24 24"${s} aria-hidden="true">${p}</svg>`;
 }
 
 /* ------------------------------------------------------------ UTILS */

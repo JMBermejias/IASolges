@@ -95,12 +95,18 @@ function afterRender(route) {
     const ta = $("#secForm [name=content]");
     if (ta) ta.oninput = () => Security.alCambiar(ta);
     const run = $("#btnSecRun");
-    if (run) run.onclick = () => Security.forzar();
+    if (run) run.onclick = () => Security.forzar(false);
+    const re = $("#btnSecRegla");
+    if (re) re.onclick = () => Security.forzar(true);   // reanaliza como automatico
+    const modo = $("#secForm [name=analisis_mode]");
+    if (modo) modo.onchange = () => Security.cambiarModo();
+    Security.cuenta = 0;
+    Security.refrescarEstado();
     const ej = $("#btnSecSample");
     if (ej) ej.onclick = () => {
       ta.value = EJEMPLO_SEGURIDAD;
       Security.ultimo = EJEMPLO_SEGURIDAD;
-      ejecutarChequeo({ auto: false });
+      ejecutarChequeo({ auto: Security.modo() === "auto" });
     };
   }
   const f = $("#modSearch");
@@ -987,23 +993,72 @@ const Geo = {
 const Security = {
   timer: null,
   ultimo: "",
+  enCurso: false,
+  cuenta: 0,
+
+  /** Modo elegido: "auto" (analisis solo con IA) o "manual". */
+  modo() {
+    const m = $("#secForm [name=analisis_mode]");
+    return m ? m.value : "auto";
+  },
+
+  /** Pinta el aviso de estado segun el modo y lo que este pasando. */
+  estado(txt, tono) {
+    const c = $("#secEstado");
+    if (!c) return;
+    c.dataset.modo = tono || Security.modo();
+    if (txt) c.querySelector(".sec-modo-txt").innerHTML = txt;
+  },
+
+  /** Refresca el aviso con el texto que corresponde al modo actual. */
+  refrescarEstado() {
+    if (Security.enCurso) {
+      Security.estado("<b>Analizando con la IA...</b> Espera un momento.");
+      return;
+    }
+    if (Security.modo() === "manual") {
+      Security.estado("<b>Modo manual.</b> No se analiza solo: pega el contenido y pulsa " +
+                      "<b>Analizar ahora</b>.");
+    } else {
+      Security.estado("<b>Automatico con IA activo.</b> Se analiza solo 1,5 s despues de que dejes " +
+                      "de escribir. No hace falta que pulses nada.");
+    }
+  },
+
+  /** Cambia de modo desde el desplegable. */
+  cambiarModo() {
+    clearTimeout(Security.timer);
+    const ta = $("#secForm [name=content]");
+    const hay = ta && ta.value.trim().length >= 25;
+    if (Security.modo() === "auto") {
+      // Al activar el automatico, si ya hay contenido, se analiza de inmediato.
+      Security.ultimo = "";
+      Security.refrescarEstado();
+      if (hay) Security.alCambiar(ta);
+    } else {
+      Security.refrescarEstado();
+      toast("Modo manual: pulsa Analizar ahora cuando quieras", "warn");
+    }
+  },
 
   /** Se llama al escribir/pegar: espera a que el usuario pare y lanza el analisis. */
   alCambiar(el) {
     clearTimeout(Security.timer);
+    if (Security.modo() !== "auto") { Security.refrescarEstado(); return; }
     const v = (el.value || "").trim();
-    if (v.length < 25 || v === Security.ultimo) return;
+    if (v.length < 25 || v === Security.ultimo) { Security.refrescarEstado(); return; }
+    Security.estado("<b>Automatico con IA:</b> se analizara solo al terminar de escribir...");
     Security.timer = setTimeout(() => {
       Security.ultimo = v;
       ejecutarChequeo({ auto: true });
     }, 1600);
   },
 
-  /** Fuerza el analisis de lo que hay ahora mismo. */
-  forzar() {
+  /** Fuerza el analisis de lo que hay ahora mismo (vale en los dos modos). */
+  forzar(auto) {
     clearTimeout(Security.timer);
     Security.ultimo = ($("#secForm [name=content]") || {}).value || "";
-    ejecutarChequeo({ auto: false });
+    ejecutarChequeo({ auto: !!auto });
   },
 };
 
@@ -1014,6 +1069,8 @@ async function ejecutarChequeo(opts) {
   if (!String(d.content || "").trim()) return;
   const salida = $("#secOut");
   if (opts && opts.auto && salida && salida.dataset.tieneInforme === "1") return;
+  Security.enCurso = true;
+  Security.refrescarEstado();
   if (salida) {
     salida.dataset.tieneInforme = "0";
     salida.innerHTML = `<div class="panel"><div class="panel-body">
@@ -1023,11 +1080,16 @@ async function ejecutarChequeo(opts) {
   }
   try {
     const r = await Api.post("/api/ai/security", d);
+    Security.enCurso = false;
+    Security.cuenta = (Security.cuenta || 0) + 1;
+    Security.refrescarEstado();
     if (!salida) return;
     salida.dataset.tieneInforme = "1";
     salida.innerHTML = pintarInformeSeguridad(r);
     if (!(opts && opts.auto)) toast("Chequeo completado", "ok");
   } catch (err) {
+    Security.enCurso = false;
+    Security.refrescarEstado();
     if (salida) salida.innerHTML = empty("alert", "Error", err.message);
   }
 }
@@ -1579,8 +1641,7 @@ async function boot() {
   try {
     const ping = await Api.get("/api/ping");
     State.engine = ping.ai || State.engine;
-    $("#engineName").textContent = State.engine.label;
-    $("#engineBox").classList.toggle("remote", State.engine.provider !== "local");
+    pintarMotor(State.engine);
     $("#brandVer").textContent = "v" + ping.version;
     const st = await Api.get("/api/settings");
     if (st.theme) document.documentElement.dataset.theme = st.theme;

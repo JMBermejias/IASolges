@@ -601,21 +601,29 @@ VIEWS["seguridad"] = async function (params) {
   <div class="grid2 mb">
     <div class="panel"><div class="panel-head"><h3>${icon("shield")} Analizar contenido</h3></div>
       <div class="panel-body"><form class="form" id="secForm">
-        ${field("Titulo del analisis", input("title", "Chequeo manual"))}
+        ${field("Tipo de analisis", select("analisis_mode", "auto",
+            [["auto", "Automatico con IA"], ["manual", "Manual (yo pulso Analizar)"]]))}
+        <div class="sec-modo" id="secEstado" data-modo="auto">
+          <span class="sec-modo-dot"></span>
+          <span class="sec-modo-txt"><b>Automatico con IA activo.</b> Se analiza solo 1,5 s despues de
+            que dejes de escribir. No hace falta que pulses nada.</span>
+        </div>
+        ${field("Titulo del analisis", input("title", "", "Chequeo de seguridad"))}
         ${field("Tipo de objetivo", select("target_type", "texto",
             [["texto", "Texto / documento"], ["configuracion", "Configuracion"], ["codigo", "Codigo fuente"], ["contrato", "Contrato / legal"]]))}
         ${field("Contenido a analizar *", textarea("content", "", "Pega aqui el texto, codigo o configuracion a revisar...", 9), null, true)}
         <div class="flex">
           <button class="btn btn-primary" type="button" id="btnSecRun">${icon("shield")} Analizar ahora</button>
           <button class="btn btn-ghost" type="button" id="btnSecSample">${icon("sparkles")} Cargar ejemplo</button>
+          <button class="btn btn-ghost" type="button" id="btnSecRegla">${icon("refresh")} Reanalizar</button>
         </div>
-        <p class="tiny muted"><b>Se analiza solo</b> 1,5 s despues de que dejes de escribir. Pulsa
-          <b>Analizar ahora</b> para no esperar. Se aplican ${icon("info", 11)} 23 reglas: credenciales y
-          tokens, claves privadas, inyecciones (SQL, comandos, XSS), traversal, CORS, TLS, algoritmos
-          debiles, datos personales, permisos, IP internas y buenas practicas.</p>
+        <p class="tiny muted">En modo <b>Automatico con IA</b> no hace falta que pulses nada; <b>Analizar ahora</b>
+          tambien sirve y no espera. Se aplican ${icon("info", 11)} 23 reglas: credenciales y tokens, claves
+          privadas, inyecciones (SQL, comandos, XSS), traversal, CORS, TLS, algoritmos debiles, datos
+          personales, permisos, IP internas y buenas practicas.</p>
       </form></div></div>
     <div id="secOut"><div class="panel"><div class="panel-body">
-      ${empty("shield", "Sin analisis", "Pega contenido a la izquierda: el analisis con IA se lanza solo, sin que tengas que pulsar nada.")}
+      ${empty("shield", "Sin analisis", "Pega contenido a la izquierda: con el modo \"Automatico con IA\" el analisis se lanza solo, sin que tengas que pulsar nada.")}
     </div></div></div>
   </div>
 
