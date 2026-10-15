@@ -184,7 +184,10 @@ check("presupuestos: exportar CSV", PRESU.includes("exportall"));
 
 const SEG = await VIEWS["seguridad"]({ q: {} });
 check("seguridad: formulario", SEG.includes('id="secForm"') && SEG.includes("API key") === false);
-check("seguridad: reglas listadas", SEG.includes("tokens expuestos"));
+check("seguridad: reglas listadas", SEG.includes("23 reglas") && SEG.includes("inyeccion"),
+      SEG.slice(0, 120));
+check("seguridad: analisis automatico", SEG.includes("Se analiza solo"), "");
+check("seguridad: boton de ejemplo", SEG.includes("btnSecSample") || SEG.includes("Cargar ejemplo"), "");
 
 const MAPA = await VIEWS["mapa"]({ q: {} });
 check("mapa: formulario", MAPA.includes('id="geoForm"'));

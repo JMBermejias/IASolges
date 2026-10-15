@@ -109,3 +109,8 @@ Arregla la carga de modelos en Configuracion. El selector era un campo de texto 
 
 Arregla el selector de modelos, que se quedaba vacio al navegar a Configuracion. Solo se rellenaba en el arranque de la aplicacion, nunca despues de navegar a la vista, asi que el desplegable llegaba sin opciones. Se inicializa ahora en afterRender, con cada entrada a la vista. Anade tests/test_dom.mjs: prueba de interfaz con DOM real que reproduce el flujo del usuario (arrancar en Inicio y pulsar en Configuracion) y comprueba que el selector trae modelos y que se recarga al cambiar de proveedor.
 
+
+## [1.3.3] - 2026-10-15
+
+Arregla los cuatro modulos indicados. Seguridad: el informe se borraba 50 ms despues de pintarse (la vista se re-renderizaba), ahora se queda; pasa de 10 a 23 reglas de deteccion; y el analisis con IA se lanza solo 1,5 s despues de dejar de escribir, con botones 'Analizar ahora' y 'Cargar ejemplo'. Mapa localizador: los marcadores y las filas no tenian manejador de clic, ahora son seleccionables, con panel de detalle, seleccion multiple y boton 'Analizar seleccion con IA' que dice que tienen y que les falta a los resultados. Generador de prompts: al describir la idea se genera solo el prompt en codigo. Kit de marca: boton 'Generar la marca con IA' dentro del formulario de nueva marca, que rellena los campos deducidos y muestra la previsualizacion.
+

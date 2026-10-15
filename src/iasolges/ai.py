@@ -333,6 +333,7 @@ def local_generate(task, prompt, ctx=None):
         "names": _ll_names,
         "analyze": _ll_analyze,
         "geo": _ll_geo,
+        "geo_detail": _ll_geo_detail,
         "prospects": _ll_prospects,
         "campaign": _ll_campaign,
         "client": _ll_client,
@@ -394,6 +395,66 @@ def _ll_opt_prompt(prompt, ctx):
     )
 
 
+
+
+def codigo_prompt(descripcion, categoria="general", objetivo=""):
+    """
+    Convierte una idea escrita en lenguaje natural en un prompt estructurado
+    en codigo, listo para pegar en cualquier IA.
+    """
+    desc = re.sub(r"\s+", " ", (descripcion or "")).strip()
+    obj = re.sub(r"\s+", " ", (objetivo or "")).strip() or desc[:80]
+
+    roles = {
+        "ventas": "un consultor comercial experto en ventas B2B",
+        "marketing": "un estratega de marketing digital",
+        "analisis": "un analista de datos riguroso",
+        "codigo": "un ingeniero de software senior",
+        "estrategia": "un consultor de estrategia de negocio",
+        "contenido": "un redactor de contenido",
+        "general": "un asistente experto",
+    }
+    rol = roles.get(categoria, roles["general"])
+
+    # Palabras significantes de la idea -> propuestas de variables.
+    palabras = [w for w in re.findall(r"\b[a-zA-Z_][\w]{3,}\b", desc)
+                if w.lower() not in ("para", "que", "como", "este", "esta", "nuestro",
+                                     "nuestra", "quiero", "necesito", "prompt", "una", "uno")]
+    vs = []
+    for w in palabras:
+        if w.lower() not in [v.lower() for v in vs]:
+            vs.append(w)
+        if len(vs) == 3:
+            break
+    bloque_vars = ("\n".join(f"- {{{v}}}: [valor]" for v in vs)
+                   if vs else "- Ninguna: el prompt ya es autocontenido.")
+
+    return f"""# Rol
+Actua como {rol}.
+
+# Contexto
+- Categoria: {categoria}
+- Objetivo: {obj}
+- Idioma de salida: castellano
+
+# Tarea
+{desc}
+
+# Formato de salida
+1. Titular: una frase que resuma lo esencial.
+2. Desarrollo: entre 150 y 400 palabras, en parrafos cortos.
+3. Puntos clave: de 3 a 5 vinetas accionables.
+4. Recomendaciones: numeradas, una por linea.
+
+# Restricciones
+- Concreto y verificable, sin relleno ni frases vacias.
+- Si falta algun dato, indicarlo al final como "Datos a confirmar".
+- No inventes cifras, nombres ni citas.
+
+# Variables a sustituir
+{bloque_vars}"""
+
+
 def _ll_prompt_test(prompt, ctx):
     txt = (ctx.get("template") or "").strip()
     vars_ = re.findall(r"\{\{\s*([\w\s]+?)\s*\}\}", txt)
@@ -415,17 +476,74 @@ def _ll_prompt_test(prompt, ctx):
 
 # --------------------------------------------------------------- SEGURIDAD
 SEC_RULES = [
-    ("critico", "Clave expuesta", r"(?i)\b(api[_-]?key|apikey|secret|token|password|passwd|pwd|bearer)\b\s*[:=]\s*\S{6,}", "Rotar la credencialfiltrada de inmediato."),
-    ("critico", "Token estilo GitHub/AWS", r"\b(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,})\b", "La credencial debe considerarse comprometida."),
-    ("alto", "Dato personal", r"(?i)\b(\d{8}[A-Za-z]?|\b[67]\d{8}\b)\b|\b(nif|nie|dni|pasaporte|iban)\b", "Aplica RGPD: minimiza, cifra y limita la conservacion."),
-    ("alto", "URL no segura", r"http://(?!localhost|127\.0\.0\.1)[^\s\"']+", "Sustituye por HTTPS para evitar interceptacion."),
-    ("alto", "Permisos excesivos", r"(?i)\b(chmod\s+777|sudo\s+rm\s+-rf|eval\(|exec\(|shell=True|--dangerously-skip)\b", "Reduce privilegios: principio de minimo privilegio."),
-    ("medio", "Inyeccion SQL potencial", r"(?i)(select|insert|update|delete)\s+.*(\$\{|%\s*\(|f\")", "Usa consultas parametrizadas."),
-    ("medio", "Secreto en texto plano", r"(?i)\b(password|contrasena|clave)\b\s*[:=]\s*\S{3,}", "Sustituye por variables de entorno o gestor de secretos."),
-    ("medio", "IP interna expuesta", r"\b(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b", "Revisa si la exposicion es necesaria."),
-    ("bajo", "Email sin verificar", r"[\w.+-]+@[\w-]+\.[\w.]+", "Verifica que el dominio de correo existe."),
-    ("bajo", "Cabecera de metadatos", r"(?i)\b(DEBUG\s*=\s*True|AKIA|admin/admin)\b", "Desactiva el modo debug en produccion."),
+    # ---- criticos: credenciales y material criptografico
+    ("critico", "Clave expuesta", r"(?i)\b(api[_-]?key|apikey|secret|token|password|passwd|pwd|bearer)\b\s*[:=]\s*\S{6,}",
+     "Rotar la credencial filtrada de inmediato."),
+    ("critico", "Token estilo GitHub/AWS/OpenAI", r"\b(gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b",
+     "La credencial debe considerarse comprometida."),
+    ("critico", "Clave privada RSA/SSH", r"-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----",
+     "Revoca el par de claves y genera uno nuevo."),
+    ("critico", "Conexion sin cifrar a base de datos",
+     r"(?i)\b(mysql|postgres(ql)?|mongodb(\+srv)?|redis|amqp)://[^\s\"']*:[^\s\"'@]*@",
+     "Usa TLS y credenciales en un gestor de secretos."),
+    ("critico", "Inyeccion de comandos", r"(?i)(os\.system\(|os\.popen\(|subprocess\.[a-z]+\([^)]*shell\s*=\s*True|\bexec\(|child_process\.exec\(|\beval\(|new Function\()",
+     "Sustituye por llamadas a procesos con lista de argumentos, nunca con shell."),
+
+    # ---- altos
+    ("alto", "Dato personal", r"(?i)\b(\d{8}[A-Za-z]?|\b[67]\d{8}\b)\b|\b(nif|nie|dni|pasaporte|iban)\b",
+     "Aplica RGPD: minimiza, cifra y limita la conservacion."),
+    ("alto", "URL no segura", r"http://(?!localhost|127\.0\.0\.1)[^\s\"']+",
+     "Sustituye por HTTPS para evitar interceptacion."),
+    ("alto", "Permisos excesivos", r"(?i)\b(chmod\s+777|chmod\s+-R\s+777|sudo\s+rm\s+-rf|--dangerously-skip|--no-verify)\b",
+     "Reduce privilegios: principio de minimo privilegio."),
+    ("alto", "Inyeccion SQL concatenada",
+     r"(?i)(select\s+.*from|insert\s+into|update\s+\w+\s+set|delete\s+from)[^;\n]{0,120}"
+     r"(\$\{|\+\s*[\w\"']|%\s*\(|f[\"']|format\()",
+     "Usa consultas parametrizadas (placeholders)."),
+    ("alto", "XSS posible", r"(?i)(innerHTML\s*=\s*[^;]+|outerHTML\s*=\s*[^;]+|document\.write\(|insertAdjacentHTML\(|\$\([^)]*\)\.html\(|\bv-html\b|dangerouslySetInnerHTML)",
+     "Escapa la salida o usa textContent."),
+    ("alto", "Ruta de traversal", r"(\.\./\.\./|\.\.%2f|%2e%2e[/\\]|/etc/passwd|/proc/self/environ)",
+     "Valida y normaliza las rutas antes de usarlas."),
+
+    # ---- medios
+    ("medio", "Secreto en texto plano", r"(?i)\b(password|contrasena|clave|secret)\b\s*[:=]\s*\S{3,}",
+     "Sustituye por variables de entorno o gestor de secretos."),
+    ("medio", "IP interna expuesta", r"\b(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b",
+     "Revisa si la exposicion es necesaria."),
+    ("medio", "CORS abierto", r"(?i)(Access-Control-Allow-Origin[\"']?\s*[:,]\s*[\"']?\*|cors\(\{\s*origin\s*:\s*[\"']?\*)",
+     "Limita el origen a los dominios permitidos."),
+    ("medio", "Algoritmo criptografico debil",
+     r"(?i)\b(md5|sha1)\b(?![-\w])|createHash\([\"'](md5|sha1)[\"']\)|DES|RC4",
+     "Usa SHA-256 o superior; para contrasenas, bcrypt/argon2."),
+    ("medio", "Puerto de administracion expuesto",
+     r"(?i)\b(3306|5432|6379|27017|9200|8080|8443|22)\b[^\n]{0,40}\b(open|public|0\.0\.0\.0|bind|listen)\b",
+     "Restringe el acceso por firewall o VPN."),
+    ("medio", "Ausencia de caducidad en el token", r"(?i)(jwt|token)[^\n]{0,30}(exp|expires|expiracion)\s*[:=]\s*(null|none|\"\"|0|false)",
+     "Define siempre una fecha de caducidad."),
+    ("medio", "Desactivacion de verificacion TLS",
+     r"(?i)(verify\s*=\s*False|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*0|InsecureSkipVerify\s*:\s*true)",
+     "No desactives la verificacion del certificado."),
+
+    # ---- bajos
+    ("bajo", "Modo depuracion activo", r"(?i)\b(DEBUG\s*=\s*True|app\.run\([^)]*debug\s*=\s*True|\.env\s*cargad[oa]\s*en\s*produccion)\b",
+     "Desactiva el modo debug en produccion."),
+    ("bajo", "Comentario con datos sensibles", r"(?i)//.*\b(todo|fixme|xxx)\b.*\b(key|token|password|secret)\b",
+     "Limpia los comentarios antes de publicar."),
+    ("bajo", "Email sin verificar", r"[\w.+-]+@[\w-]+\.[\w.]{2,}", "Verifica que el dominio de correo existe."),
+    ("bajo", "Credencial por defecto", r"(?i)\b(admin/admin|root/root|test/test|user/user|guest/guest|password1)\b",
+     "Cambia las credenciales por defecto."),
+    ("bajo", "Cabecera de seguridad ausente",
+     r"(?i)(Content-Security-Policy|X-Frame-Options|Strict-Transport-Security)",
+     "Comprueba que existen (se lista como referencia de auditoria)."),
 ]
+
+# Cobertura aproximada: se informa de que reglas se aplicaron.
+SEC_CATEGORIAS = {
+    "critico": "compromiso de credenciales o ejecucion de codigo",
+    "alto": "exposicion de datos o inyeccion",
+    "medio": "debilitacion de controles",
+    "bajo": "buenas practicas",
+}
 
 
 def scan_security(content):
@@ -560,6 +678,60 @@ SLOGANS = {
     "industrial": ["Industria que avanza", "Precision en cada ciclo", "Producimos confianza"],
 }
 
+
+
+_CAMPOS_MARCA = {
+    "general": {"audience": "empresas decidas a mejorar sus resultados",
+                "values": "cercania, rigor, resultados", "personality": "autoridad"},
+    "tecnologia": {"audience": "pymes tecnologicas de 10 a 200 empleados",
+                   "values": "innovacion, claridad, fiabilidad", "personality": "innovacion"},
+    "salud": {"audience": "clinicas y consultorios privados",
+              "values": "cercania, rigor, confianza", "personality": "proximidad"},
+    "legal": {"audience": "despachos y asesorias juridicas de 5 a 50 profesionales",
+              "values": "rigor, confidencialidad, criterio", "personality": "autoridad"},
+    "construccion": {"audience": "promotoras, constructoras y estudios de arquitectura",
+                     "values": "solidez, plazos, oficio", "personality": "elegancia"},
+    "ecommerce": {"audience": "tiendas online y marcas de venta directa",
+                  "values": "cercania, conversione, simplicidad", "personality": "proximidad"},
+    "educacion": {"audience": "academias y centros de formacion",
+                  "values": "aprendizaje, confianza,inclusion", "personality": "proximidad"},
+    "hosteleria": {"audience": "restaurantes, hoteles y cafes con clientela local",
+                   "values": "oficio, hospitalidad, tradicion", "personality": "elegancia"},
+    "servicios": {"audience": "pymes y autonomos que buscan un socio externo",
+                  "values": "cercania, rigor, resultados", "personality": "autoridad"},
+    "agricultura": {"audience": "explotaciones y cooperativas agricolas",
+                    "values": "raiz, oficio, temporada", "personality": "elegancia"},
+    "industrial": {"audience": "plantas y empresas industriales",
+                   "values": "precision, seguridad, continuidad", "personality": "autoridad"},
+}
+_CAMPOS_MARCA["educacion"]["values"] = "aprendizaje, confianza, inclusion"
+_CAMPOS_MARCA["hosteleria"]["audience"] = "restaurantes, hoteles y cafes con publico local"
+_CAMPOS_MARCA["servicios"]["audience"] = "pymes y autonomos que buscan un socio externo"
+
+
+def campos_marca(ctx):
+    """Rellena los campos del formulario con lo que la IA deduce del contexto."""
+    base = dict(_CAMPOS_MARCA.get((ctx.get("sector") or "general").lower(),
+                                 _CAMPOS_MARCA["general"]))
+    if ctx.get("audience"):
+        base["audience"] = ctx["audience"]
+    if ctx.get("values"):
+        base["values"] = ctx["values"]
+    if ctx.get("personality"):
+        base["personality"] = ctx["personality"]
+    base["sector"] = ctx.get("sector") or "general"
+    return base
+
+
+def resumen_marca(ctx):
+    """Una frase de posicionamiento para el campo de descripcion."""
+    sector = (ctx.get("sector") or "general").lower()
+    act = _pick(_sector_ctx(sector)["actores"], 0)
+    aud = ctx.get("audience") or _CAMPOS_MARCA.get(sector, {}).get(
+        "audience", "empresas que buscan resultados")
+    return (f"Marca del sector {sector} dirigida a {aud}. "
+            f"Se posiciona como {_pick(['la opción más fiable', 'la más sencilla', 'la más rápida'], 0)} "
+            f"para {act}, con foco en {_pick(_sector_ctx(sector)['metricas'], 0)}.")
 
 def _ll_brand(prompt, ctx):
     sector = ctx.get("sector", "general")
@@ -843,6 +1015,79 @@ PAINS = ["el seguimiento manual", "los presupuestos lentos", "la dispersion de d
          "la falta de visibilidad", "los procesos repetitivos", "el churn de clientes",
          "la captacion impredecible", "el trabajo duplicado"]
 
+
+
+def _ll_geo_detail(prompt, ctx):
+    """Que tienen y que les falta a los resultados de prospeccion."""
+    res = ctx.get("resultados") or []
+    if not res:
+        return "# Sin resultados\n\nSelecciona al menos un resultado del mapa."
+    scores = [float(r.get("score") or 0) for r in res]
+    tipos, pains, sizes = {}, {}, {}
+    for r in res:
+        tipos[r.get("business_type") or "sin tipo"] = tipos.get(r.get("business_type") or "sin tipo", 0) + 1
+        pains[r.get("pain") or "sin senal"] = pains.get(r.get("pain") or "sin senal", 0) + 1
+        sizes[r.get("size") or "sin dato"] = sizes.get(r.get("size") or "sin dato", 0) + 1
+    media = sum(scores) / len(scores) if scores else 0
+    top = max(res, key=lambda r: float(r.get("score") or 0))
+    weak = min(res, key=lambda r: float(r.get("score") or 0))
+    ubic = ctx.get("localidad") or "la zona"
+
+    def mas(d, n=3):
+        return ", ".join(f"{k} ({v})" for k, v in sorted(d.items(), key=lambda x: -x[1])[:n]) or "sin datos"
+
+    return f"""# Analisis de los resultados seleccionados
+
+Se han analizado **{len(res)}** resultados de **{ubic}**.
+
+| Indicador | Valor |
+|---|---|
+| Puntuacion media | **{media:.0f} / 100** |
+| Puntuacion mas alta | {float(top.get('score') or 0):.0f} — {top.get('name')} |
+| Puntuacion mas baja | {float(weak.get('score') or 0):.0f} — {weak.get('name')} |
+| Tipos de negocio | {mas(tipos)} |
+| Tamano medio | {mas(sizes)} |
+| Problemas detectados | {mas(pains)} |
+
+## Que tienen estos resultados
+
+- **Datos de contacto completos**: {sum(1 for r in res if r.get('phone'))} de {len(res)} tienen telefono
+  y {sum(1 for r in res if r.get('email'))} tienen email.
+- **Ubicacion verificable**: todos estan dentro del radio buscado, con coordenadas.
+- **Perfil de negocio identificado**: tipo de actividad y tamano aproximado de plantilla.
+- **Senal de dolor concreta**: cada resultado tiene un problema tipico asignado.
+
+## Que les falta
+
+1. **Conocimiento del decisor.** No consta quien decide ni con que presupuesto:
+   esto es lo primero que hay que averiguar en la primera llamada.
+2. **Estado digital.** No sabemos si tienen web, si la actualizan ni si responden a un formulario.
+   Sin web, la oportunidad de venta es mucho mayor.
+3. **Historial comercial.** No hay datos de si ya trabajan con un competidor
+   ni de cuando se renovo su proveedor actual.
+4. **Valorificacion economica.** Falta estimar cuanto factura cada negocio para
+   saber cuanto presupuesto pueden asumir.
+5. **Canal de contacto valido.** Correos y telefonos generados por patron: hay que
+   verificarlos antes de escribir, o se pierde credibilidad.
+
+## Por donde empezar
+
+1. **Empieza por los de mayor puntuacion** ({top.get('name')}, {float(top.get('score') or 0):.0f}/100):
+   concentra aqui el 60% del esfuerzo inicial.
+2. **Descarta o aparca los mas debiles** ({weak.get('name')}, {float(weak.get('score') or 0):.0f}/100):
+   no gastes tiempo en ellos hasta tener señales nuevas.
+3. **Verifica contactos antes de contactar.** Un email que no existe quema la
+   relacion en el primer envio.
+4. **Prepara una propuesta de valor por tipo de negocio.** {_pick(list(tipos)[:1], 0) or 'cada segmento'}
+   necesita un mensaje propio, no uno generico.
+5. **Mide por semanas:** contactos realizados, respuestas y reuniones. Sin ese
+   dato no sabes si el metodo funciona.
+
+## Siguiente paso recomendado
+
+Haz una **llamada de descubrimiento de 3 minutos** a los tres resultados con mayor
+puntuacion. El objetivo no es vender: es averiguar presupuesto, decisor y plazo.
+Con esos tres datos, el resto de la estrategia se decide sola."""
 
 def _ll_prospects(prompt, ctx):
     sector = (ctx.get("sector") or "general").lower()

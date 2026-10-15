@@ -90,6 +90,19 @@ function afterRender(route) {
   if (route === "settings" && typeof initSelectorModelos === "function") {
     try { initSelectorModelos(); } catch (e) { console.error("selector modelos", e); }
   }
+
+  if (route === "seguridad") {
+    const ta = $("#secForm [name=content]");
+    if (ta) ta.oninput = () => Security.alCambiar(ta);
+    const run = $("#btnSecRun");
+    if (run) run.onclick = () => Security.forzar();
+    const ej = $("#btnSecSample");
+    if (ej) ej.onclick = () => {
+      ta.value = EJEMPLO_SEGURIDAD;
+      Security.ultimo = EJEMPLO_SEGURIDAD;
+      ejecutarChequeo({ auto: false });
+    };
+  }
   const f = $("#modSearch");
   if (f) f.oninput = debounce(() => {
     State.params.q = State.params.q || {};
@@ -116,13 +129,46 @@ async function openForm(route, id) {
   const body = `<form class="form" id="editForm">
       <div class="form-grid">${cfg.form.map(f => f).join("")}</div>
       ${cfg.extraForm ? cfg.extraForm(row) : ""}
+      ${cfg.formFooter || ""}
     </form>`;
   const foot = `<button class="btn btn-ghost left" data-close>Cancelar</button>
     <button class="btn btn-primary" id="btnSave">${icon("save")} Guardar</button>`;
 
-  Modal.open((id ? "Editar" : "Nuevo") + " - " + cfg.title.toLowerCase(), body, foot, true);
+  Modal.open((id ? "Editar" : "Nuevo") + " - " + cfg.title.toLowerCase(),
+    body + '<div id="brandPreview" class="mt"></div>', foot, true);
 
   if (cfg.afterForm) await cfg.afterForm($("#editForm"), row);
+
+  // Boton opcional dentro del formulario (por ejemplo, generar con IA).
+  const bAI = $("#btnBrandAI");
+  if (bAI) bAI.onclick = async () => {
+    const f = $("#editForm");
+    const d = Object.fromEntries(new FormData(f).entries());
+    if (!String(d.name || "").trim()) return toast("Escribe primero el nombre de la marca", "warn");
+    bAI.disabled = true;
+    bAI.innerHTML = '<span class="spin"></span> Generando marca...';
+    const previo = $("#brandPreview");
+    if (previo) previo.innerHTML = `<div class="loading"><span class="spin dark"></span>
+       La IA esta creando el kit de marca completo...</div>`;
+    try {
+      const r = await Api.post("/api/ai/brand", { ...d, save: false });
+      if (previo) previo.innerHTML = `<div class="section-title"><h3>Kit generado</h3>
+        <div class="line"></div></div><div class="output">${md(r.text)}</div>`;
+      // Rellenar los campos que la IA haya deducido.
+      const v = r.campos || {};
+      ["sector", "audience", "values", "personality", "competitors"].forEach(k => {
+        const el = f.querySelector(`[name="${k}"]`);
+        if (el && v[k]) el.value = v[k];
+      });
+      const desc = f.querySelector('[name="description"]');
+      if (desc && !desc.value.trim()) desc.value = r.resumen || "";
+      toast("Kit de marca generado", "ok");
+    } catch (e) {
+      if (previo) previo.innerHTML = empty("alert", "Error", e.message);
+    }
+    bAI.disabled = false;
+    bAI.innerHTML = icon("sparkles") + " Generar la marca con IA";
+  };
 
   $("#btnSave").onclick = async () => {
     const form = $("#editForm");
@@ -604,34 +650,58 @@ async function runAI(action, host) {
     return;
   }
 
-  /* prompt optimizer */
+  /* Generador de prompts */
   function openPromptLab() {
-    Modal.open("Optimizador de prompts", `<form class="form" id="plForm">
-      ${field("Categoria", select("category", "general", ["general", "ventas", "marketing", "analisis", "codigo", "estrategia", "contenido"]))}
-      ${field("Objetivo", input("objective", "", null, "Escribir un email de venta"))}
-      ${field("Tu prompt *", textarea("template", "", "Describe lo que quieres...", 8), null, true)}
+    Modal.open("Generador de Prompts", `
+      <form class="form" id="plForm">
+        <div class="form-grid">
+          ${field("Categoria", select("category", "general",
+            ["general", "ventas", "marketing", "analisis", "codigo", "estrategia", "contenido"]))}
+          ${field("Objetivo", input("objective", "", null, "Escribir un email de venta"))}
+        </div>
+        ${field("Describe lo que quieres *",
+          textarea("template", "", "Ej: quiero un prompt para redactar emails de venta a.controller",
+            5),
+          "Escribe aqui tu idea con tus palabras. El prompt en codigo se genera solo.", true)}
+        <label class="check"><input type="checkbox" id="plAuto" checked>
+          Generar automaticamente mientras escribo</label>
       </form>
-      <div id="plOut"></div>`,
+      <div class="section-title"><h3>Prompt generado en codigo</h3><div class="line"></div>
+        <button class="btn btn-ghost btn-sm" id="plCopy1">${icon("copy")} Copiar</button>
+        <button class="btn btn-ghost btn-sm" id="plProbar">${icon("play")} Probar</button></div>
+      ${textarea("plPrompt", "", "El prompt generado aparecera aqui y podras editarlo", 10, "plPrompt")}
+      <div id="plSalida" class="mt"></div>`,
       `<button class="btn btn-ghost left" data-close>Cerrar</button>
-       <button class="btn btn-ghost" id="plTest">${icon("play")} Probar</button>
-       <button class="btn btn-primary" id="plRun">${icon("sparkles")} Optimizar</button>`, true);
-    const out = (txt, title) => {
-      $("#plOut").innerHTML = `<div class="section-title"><h3>${title}</h3><div class="line"></div></div>
-        <div class="output">${md(txt)}</div>`;
+       <button class="btn btn-primary" id="plRun">${icon("sparkles")} Generar prompt</button>
+       <button class="btn btn-soft" id="plSave">${icon("save")} Guardar en la biblioteca</button>`, true);
+
+    const ta = $("#plForm [name=template]");
+    const auto = $("#plAuto");
+    ta.oninput = () => { if (auto.checked) PromptLab.alEscribir(ta); };
+    $("#plRun").onclick = () => PromptLab.generar({ auto: false });
+    $("#plCopy1").onclick = () => doCopy(($("#plPrompt") || {}).value, "Prompt");
+    $("#plProbar").onclick = async () => {
+      const btn = $("#plProbar"); btn.disabled = true;
+      btn.innerHTML = '<span class="spin"></span> Probando...';
+      try {
+        const r = await Api.post("/api/ai/test_prompt",
+          { template: ($("#plPrompt") || {}).value || "" });
+        $("#plSalida").innerHTML =
+          `<div class="section-title"><h3>Prueba de ejecucion</h3><div class="line"></div></div>
+           <div class="output">${md(r.text)}</div>`;
+      } catch (e) { $("#plSalida").innerHTML = empty("alert", "Error", e.message); }
+      btn.disabled = false; btn.innerHTML = icon("play") + " Probar";
     };
-    $("#plRun").onclick = async () => {
-      const b = $("#plRun"); b.disabled = true; b.innerHTML = '<span class="spin"></span>...';
-      $("#plOut").innerHTML = '<div class="loading"><span class="spin dark"></span> Optimizando...</div>';
-      try { out((await Api.post("/api/ai/optimize_prompt", Object.fromEntries(new FormData($("#plForm")).entries()))).text, "Prompt optimizado"); }
-      catch (e) { toast(e.message, "err"); }
-      b.disabled = false; b.innerHTML = icon("sparkles") + " Optimizar";
-    };
-    $("#plTest").onclick = async () => {
-      const b = $("#plTest"); b.disabled = true; b.innerHTML = '<span class="spin"></span>...';
-      $("#plOut").innerHTML = '<div class="loading"><span class="spin dark"></span> Probando...</div>';
-      try { out((await Api.post("/api/ai/test_prompt", Object.fromEntries(new FormData($("#plForm")).entries()))).text, "Prueba de ejecucion"); }
-      catch (e) { toast(e.message, "err"); }
-      b.disabled = false; b.innerHTML = icon("play") + " Probar";
+    $("#plSave").onclick = async () => {
+      const codigo = ($("#plPrompt") || {}).value || "";
+      if (!codigo.trim()) return toast("Genera primero el prompt", "warn");
+      try {
+        await Api.post("/api/prompts", {
+          title: ($("#plForm [name=objective]") || {}).value || "Prompt generado",
+          category: ($("#plForm [name=category]") || {}).value || "general",
+          template: codigo, description: ($("#plForm [name=template]") || {}).value || "" });
+        toast("Guardado en la biblioteca de prompts", "ok");
+      } catch (e) { toast(e.message, "err"); }
     };
   }
 }
@@ -674,6 +744,14 @@ function wireEvents() {
       b.disabled = false; b.innerHTML = old;
       return;
     }
+
+    const mark = t.closest(".marker");
+    if (mark) { Geo.alternar(mark.dataset.idx); return; }
+    const fila = t.closest("#geoBody tr");
+    if (fila && !t.closest("input[type=checkbox]")) { Geo.alternar(fila.dataset.idx); return; }
+    if (t.closest("#btnGeoAI")) { Geo.analizar(); return; }
+    if (t.closest('[data-act="selAll"]')) { Geo.todos(true); return; }
+    if (t.closest('[data-act="selNone"]')) { Geo.todos(false); return; }
 
     const loc = t.closest("[data-loc]");
     if (loc) { const i = $("#geoForm [name='location']"); if (i) i.value = loc.dataset.loc; return; }
@@ -758,6 +836,220 @@ function wireEvents() {
 }
 
 /* ------------------------------------------------------------ FORMULARIOS DINAMICOS */
+const EJEMPLO_SEGURIDAD = [
+  '// Configuracion de la API',
+  'const apiKey = "sk-live-9f3a2b8c7d1e4f5a6b7c8d9e0f1a2b3c";',
+  'const DB_URL = "postgres://admin:S3cret0@10.0.0.14:5432/produccion";',
+  '',
+  'app.get("/admin", async (req, res) => {',
+  '  const id = req.query.id;',
+  '  const r = await db.query("SELECT * FROM usuarios WHERE id=" + id);',
+  '  res.send("<h1>Hola " + req.query.nombre + "</h1>");',
+  '});',
+  '',
+  'if (DEBUG === true) { console.log("sesion", req.headers.cookie); }',
+  'eval(req.body.script);'
+].join("\n");
+
+
+
+/* ==================== GENERADOR DE PROMPTS ==================== */
+const PromptLab = {
+  timer: null,
+  ultimo: "",
+
+  /* Se escribe la idea y, al parar, se genera el prompt en codigo solo. */
+  alEscribir(el) {
+    clearTimeout(PromptLab.timer);
+    const v = (el.value || "").trim();
+    const salida = $("#plSalida");
+    if (salida) salida.innerHTML = "";
+    if (v.length < 12 || v === PromptLab.ultimo) return;
+    PromptLab.timer = setTimeout(() => {
+      PromptLab.ultimo = v;
+      PromptLab.generar({ auto: true });
+    }, 1500);
+  },
+
+  async generar(opts) {
+    const f = $("#plForm");
+    if (!f) return;
+    const d = Object.fromEntries(new FormData(f).entries());
+    if (String(d.template || "").trim().length < 8) return;
+    const salida = $("#plSalida");
+    const btn = $("#plRun");
+    if (btn && !(opts && opts.auto)) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Generando...'; }
+    if (salida) salida.innerHTML = `<div class="loading"><span class="spin dark"></span>
+       ${(opts && opts.auto) ? "Generando el prompt a partir de tu idea..." : "Generando..."}</div>`;
+    try {
+      const r = await Api.post("/api/ai/optimize_prompt", d);
+      const ta = $("#plPrompt");
+      if (ta && (opts && opts.auto)) ta.value = r.codigo || ta.value;
+      if (salida) salida.innerHTML = `<div class="section-title"><h3>Prompt generado</h3>
+          <div class="line"></div>
+          <button class="btn btn-ghost btn-sm" id="plCopy2">${icon("copy")} Copiar</button></div>
+        <div class="output" id="plOut">${md(r.text)}</div>`;
+      const c = $("#plCopy2");
+      if (c) c.onclick = () => doCopy(($("#plPrompt") || {}).value || r.text, "Prompt");
+    } catch (e) {
+      if (salida) salida.innerHTML = empty("alert", "Error", e.message);
+    }
+    if (btn) { btn.disabled = false; btn.innerHTML = icon("sparkles") + " Generar prompt"; }
+  },
+};
+
+/* ==================== MAPA LOCALIZADOR ==================== */
+const Geo = {
+  resultados: [],
+  seleccion: new Set(),
+
+  montar(res) {
+    Geo.resultados = res || [];
+    Geo.seleccion = new Set();
+    if (Geo.resultados.length) {
+      Geo.seleccion.add(0);
+      const chk = document.querySelector('[data-chk="0"]');
+      if (chk) chk.checked = true;
+    }
+    Geo.pintarDetalle(0);
+  },
+
+  marcados() {
+    document.querySelectorAll("#geoBody tr").forEach(tr => {
+      const i = tr.dataset.idx;
+      tr.classList.toggle("sel", Geo.seleccion.has(i));
+    });
+    document.querySelectorAll(".marker").forEach(m => {
+      const sel = Geo.seleccion.has(m.dataset.idx);
+      m.style.opacity = Geo.seleccion.size === 0 ? ".45" : (sel ? "1" : ".35");
+      m.style.transform = sel ? "scale(1.35)" : "scale(1)";
+    });
+  },
+
+  alternar(i) {
+    if (Geo.seleccion.has(i)) Geo.seleccion.delete(i); else Geo.seleccion.add(i);
+    const chk = document.querySelector(`[data-chk="${i}"]`);
+    if (chk) chk.checked = Geo.seleccion.has(i);
+    Geo.marcados();
+    Geo.pintarDetalle(i);
+  },
+
+  pintarDetalle(i) {
+    const cuerpo = $("#geoDetailBody");
+    if (cuerpo) cuerpo.innerHTML = detalleHtml(Geo.resultados[i]);
+  },
+
+  todos(v) {
+    Geo.seleccion = new Set(v ? Geo.resultados.map((_, i) => String(i)) : []);
+    document.querySelectorAll("[data-chk]").forEach(c => { c.checked = v; });
+    Geo.marcados();
+    if (v) Geo.pintarDetalle(0);
+  },
+
+  /** Analiza con IA lo que los resultados seleccionados tienen y lo que les falta. */
+  async analizar() {
+    const sel = Array.from(Geo.seleccion).map(Number).filter(n => !isNaN(n));
+    if (!sel.length) return toast("Selecciona al menos un resultado", "warn");
+    const picked = sel.map(i => Geo.resultados[i]).filter(Boolean);
+    const btn = $("#btnGeoAI");
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Analizando...'; }
+    const salida = $("#geoAI");
+    if (salida) salida.innerHTML = `<div class="loading"><span class="spin dark"></span>
+       Analizando ${picked.length} resultado(s) con la IA...</div>`;
+    try {
+      const r = await Api.post("/api/ai/geo-detail", { resultados: picked });
+      if (salida) salida.innerHTML = `<div class="output">${md(r.text)}</div>`;
+      if (salida) salida.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (e) {
+      if (salida) salida.innerHTML = empty("alert", "Error", e.message);
+    }
+    if (btn) { btn.disabled = false; btn.innerHTML = icon("sparkles") + " Analizar seleccion con IA"; }
+  },
+};
+
+/* ---------- Chequeo de seguridad: analisis automatico ---------- */
+const Security = {
+  timer: null,
+  ultimo: "",
+
+  /** Se llama al escribir/pegar: espera a que el usuario pare y lanza el analisis. */
+  alCambiar(el) {
+    clearTimeout(Security.timer);
+    const v = (el.value || "").trim();
+    if (v.length < 25 || v === Security.ultimo) return;
+    Security.timer = setTimeout(() => {
+      Security.ultimo = v;
+      ejecutarChequeo({ auto: true });
+    }, 1600);
+  },
+
+  /** Fuerza el analisis de lo que hay ahora mismo. */
+  forzar() {
+    clearTimeout(Security.timer);
+    Security.ultimo = ($("#secForm [name=content]") || {}).value || "";
+    ejecutarChequeo({ auto: false });
+  },
+};
+
+async function ejecutarChequeo(opts) {
+  const f = $("#secForm");
+  if (!f) return;
+  const d = Object.fromEntries(new FormData(f).entries());
+  if (!String(d.content || "").trim()) return;
+  const salida = $("#secOut");
+  if (opts && opts.auto && salida && salida.dataset.tieneInforme === "1") return;
+  if (salida) {
+    salida.dataset.tieneInforme = "0";
+    salida.innerHTML = `<div class="panel"><div class="panel-body">
+      <div class="loading"><span class="spin dark"></span>
+        ${opts && opts.auto ? "Analizando automaticamente con la IA..." : "Analizando riesgos..."}</div>
+      </div></div>`;
+  }
+  try {
+    const r = await Api.post("/api/ai/security", d);
+    if (!salida) return;
+    salida.dataset.tieneInforme = "1";
+    salida.innerHTML = pintarInformeSeguridad(r);
+    if (!(opts && opts.auto)) toast("Chequeo completado", "ok");
+  } catch (err) {
+    if (salida) salida.innerHTML = empty("alert", "Error", err.message);
+  }
+}
+
+function pintarInformeSeguridad(r) {
+  const fs = r.findings || [];
+  const por = { critico: 0, alto: 0, medio: 0, bajo: 0 };
+  fs.forEach(f => { por[f.severity] = (por[f.severity] || 0) + 1; });
+  return `
+    <div class="panel mb"><div class="panel-body">
+      <div class="flex-between mb">
+        <div><span class="k-label">Nivel de riesgo</span>
+          <div style="font-size:22px;font-weight:800">${badge(r.risk_level)}</div></div>
+        <div style="text-align:right"><span class="k-label">Exposicion</span>
+          <div style="font-size:22px;font-weight:800">${r.score}<span class="muted" style="font-size:13px">/100</span></div></div>
+      </div>
+      <div class="bar mb"><i style="width:${r.score}%"></i></div>
+      <div class="chips mb">
+        ${por.critico ? `<span class="badge b-err">${por.critico} criticos</span>` : ""}
+        ${por.alto ? `<span class="badge b-err">${por.alto} altos</span>` : ""}
+        ${por.medio ? `<span class="badge b-warn">${por.medio} medios</span>` : ""}
+        ${por.bajo ? `<span class="badge b-info">${por.bajo} bajos</span>` : ""}
+        ${!fs.length ? `<span class="badge b-ok">Sin hallazgos</span>` : ""}
+      </div>
+      ${fs.length ? `<div class="table-wrap" style="max-height:300px;overflow:auto">
+        <table><thead><tr><th>Severidad</th><th>Hallazgo</th><th>Evidencia</th><th>Accion</th></tr></thead>
+        <tbody>${fs.map((f, i) => `<tr>
+          <td>${badge(f.severity)}</td>
+          <td><b>${esc(f.title)}</b></td>
+          <td><span class="mono tiny">${esc(f.match.slice(0, 70))}</span></td>
+          <td class="tiny">${esc(f.advice)}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="muted tiny mb">Ninguna regla se ha activado. El analisis de la IA va igualmente mas alla.</p>`}
+    </div></div>
+    <div class="panel"><div class="panel-head"><h3>${icon("shield")} Informe de la IA</h3>
+      <span class="badge b-info">${esc(r.engine && r.engine.label || "")}</span></div>
+      <div class="panel-body"><div class="output" id="secInforme">${md(r.text)}</div></div></div>`;
+}
+
 document.addEventListener("submit", async (e) => {
   const f = e.target;
   e.preventDefault();
@@ -768,8 +1060,10 @@ document.addEventListener("submit", async (e) => {
       Buscando oportunidades y analizando el mercado...</div>`;
     try {
       const r = await Api.post("/api/ai/geo", d);
-      $("#geoResult").innerHTML = mapHtml({ location: r.location, radius: r.radius,
+      $("#geoResult").innerHTML =
+        `<div id="geoAI" class="mb"></div>` + mapHtml({ location: r.location, radius: r.radius,
         sector: r.sector, results: r.results, analysis: r.analysis });
+      Geo.montar(r.results);
       toast(r.results.length + " oportunidades encontradas", "ok");
     } catch (er) {
       $("#geoResult").innerHTML = empty("alert", "Error", er.message);
@@ -779,6 +1073,7 @@ document.addEventListener("submit", async (e) => {
   if (f.id === "secForm") {
     const d = Object.fromEntries(new FormData(f).entries());
     if (!String(d.content || "").trim()) return toast("Pega algo a analizar", "warn");
+    // La IA se encarga sola: no hace falta pulsar nada.
     $("#secOut").innerHTML = `<div class="panel"><div class="panel-body">
       <div class="loading"><span class="spin dark"></span> Analizando riesgos...</div></div></div>`;
     try {
@@ -797,7 +1092,6 @@ document.addEventListener("submit", async (e) => {
         <div class="panel"><div class="panel-head"><h3>${icon("shield")} Informe</h3></div>
           <div class="panel-body"><div class="output">${md(r.text)}</div></div></div>`;
       toast("Chequeo completado", "ok");
-      setTimeout(() => go("seguridad", State.params), 50);
     } catch (er) {
       $("#secOut").innerHTML = empty("alert", "Error", er.message);
     }

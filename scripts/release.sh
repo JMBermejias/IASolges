@@ -105,15 +105,17 @@ node tests/test_views.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 
 # Prueba de interfaz con DOM real (opcional: necesita jsdom).
 if node -e "require('jsdom')" >/dev/null 2>&1; then
-    echo "  Ejecutando prueba de DOM (jsdom)..."
+    echo "  Ejecutando pruebas de DOM (jsdom)..."
     node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_modules_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 else
     CACHE_JS="${TMPDIR:-/tmp}/iasolges-jsdom"
     echo "  Instalando jsdom en $CACHE_JS para la prueba de DOM..."
     mkdir -p "$CACHE_JS"
     ( cd "$CACHE_JS" && npm install jsdom --silent --no-audit --no-fund >/dev/null 2>&1 ) || true
     if [ -d "$CACHE_JS/node_modules/jsdom" ]; then
-        NODE_PATH="$CACHE_JS/node_modules" node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+        node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+        node tests/test_modules_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     else
         echo "  AVISO: no se pudo instalar jsdom; se omite la prueba de DOM."
     fi

@@ -467,38 +467,92 @@ function mapHtml(res) {
   const W = 100, H = 100;
   const sx = v => ((v - minLat + pad) / ((maxLat - minLat) + pad * 2 || 1)) * W;
   const sy = v => H - ((v - minLon + pad) / ((maxLon - minLon) + pad * 2 || 1)) * H;
-  const markers = pts.map((p, i) => {
-    const c = p.score >= 80 ? "#16A34A" : p.score >= 60 ? "#1D6FA5" : "#94A3B8";
-    const r = 1.6 + (p.score / 100) * 2.4;
-    return `<g class="marker" data-idx="${i}"><circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r}" fill="${c}" fill-opacity=".82">
-      <title>${esc(p.name)} - ${p.score}/100</title></circle></g>`;
-  }).join("");
-  const first = pts[0];
+
+  const color = sc => (sc >= 80 ? "#5C8C72" : sc >= 60 ? "#6E9CC4" : "#A9BCCC");
+  const r = sc => 2.0 + (sc / 100) * 2.6;
+
+  const markers = pts.map((p, i) => `
+    <g class="marker" data-idx="${i}" tabindex="0" role="button"
+       aria-label="${esc(p.name)}">
+      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r(p.score)}" fill="${color(p.score)}"
+              fill-opacity=".85" stroke="#fff" stroke-width="1"/>
+      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r(p.score) + 2.5}" fill="none"
+              stroke="${color(p.score)}" stroke-width=".4" opacity=".45"/>
+      <title>${esc(p.name)} — ${p.score}/100\n${esc(p.address)}</title>
+    </g>`).join("");
+
   return `
   <div class="section-title"><h3>Mapa de resultados</h3><div class="line"></div>
-    <span class="badge b-info">${pts.length} resultados</span></div>
+    <span class="badge b-info">${pts.length} resultados</span>
+    <span class="muted tiny">Pulsa un punto o una fila para ver el detalle</span></div>
+
   <div class="map-wrap mb">
     <svg viewBox="0 0 100 100" preserveAspectRatio="none">${markers}</svg>
     <div class="map-legend">
-      <div><i style="background:#16A34A"></i>Alta prioridad (&gt;80)</div>
-      <div><i style="background:#1D6FA5"></i>Media (60-80)</div>
-      <div><i style="background:#94A3B8"></i>Baja (&lt;60)</div>
+      <div><i style="background:#5C8C72"></i>Alta prioridad (&gt;80)</div>
+      <div><i style="background:#6E9CC4"></i>Media (60–80)</div>
+      <div><i style="background:#A9BCCC"></i>Baja (&lt;60)</div>
     </div>
-    <div class="map-info"><b>${esc(res.location)}</b> - radio ${res.radius} km<br>
-      <span class="muted tiny">Sector ${esc(res.sector || "general")}</span></div>
+    <div class="map-info"><b>${esc(res.location)}</b> — radio ${res.radius} km<br>
+      <span class="muted tiny">Sector ${esc(res.sector || "general")} · ${pts.length} oportunidades</span></div>
   </div>
 
   <div class="grid2 mb">
-    <div class="panel"><div class="panel-head"><h3>${icon("crosshair")} Oportunidades</h3></div>
-      <div class="table-wrap" style="max-height:340px;overflow-y:auto">
-        <table><thead><tr><th>Negocio</th><th class="num">Score</th></tr></thead><tbody>
-        ${pts.slice(0, 60).map((p, i) => `<tr data-idx="${i}" style="cursor:pointer">
-          <td><b>${esc(p.name)}</b><div class="muted tiny trunc">${esc(p.address)}</div></td>
-          <td class="num"><span class="badge ${p.score >= 80 ? "b-ok" : p.score >= 60 ? "b-info" : ""}">${p.score}</span></td>
-        </tr>`).join("")}</tbody></table></div></div>
-    <div class="panel"><div class="panel-head"><h3>${icon("sparkles")} Analisis IA</h3></div>
-      <div class="panel-body"><div class="output">${md(res.analysis)}</div></div></div>
-  </div>`;
+    <div class="panel"><div class="panel-head">
+        <h3>${icon("crosshair")} Oportunidades</h3>
+        <div class="flex">
+          <button class="btn btn-ghost btn-sm" data-act="selAll">Seleccionar todo</button>
+          <button class="btn btn-ghost btn-sm" data-act="selNone">Ninguno</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:360px;overflow:auto">
+        <table><thead><tr><th style="width:34px"></th><th>Negocio</th>
+          <th class="num">Score</th><th style="width:34px"></th></tr></thead>
+        <tbody id="geoBody">${pts.map((p, i) => `
+          <tr data-idx="${i}" style="cursor:pointer" class="${i === 0 ? "sel" : ""}">
+            <td><input type="checkbox" data-chk="${i}" ${i === 0 ? "checked" : ""}
+                       style="width:15px;height:15px;accent-color:var(--brand-2);cursor:pointer"></td>
+            <td><b>${esc(p.name)}</b>
+              <div class="muted tiny">${esc(p.address)}</div>
+              <div class="muted tiny">${esc(p.phone)} · ${esc(p.email)}</div></td>
+            <td class="num"><span class="badge ${p.score >= 80 ? "b-ok" : p.score >= 60 ? "b-info" : ""}">${p.score}</span></td>
+            <td class="num muted tiny">${i === 0 ? "&#9666;" : ""}</td>
+          </tr>`).join("")}</tbody></table>
+      </div></div>
+
+    <div class="panel" id="geoDetail"><div class="panel-head">
+        <h3>${icon("info")} Detalle del resultado</h3></div>
+      <div class="panel-body" id="geoDetailBody">${detalleHtml(pts[0])}</div>
+      <div class="panel-body" style="border-top:1px solid var(--line)">
+        <div class="flex">
+          <button class="btn btn-primary" id="btnGeoAI">${icon("sparkles")} Analizar seleccion con IA</button>
+        </div>
+        <p class="tiny muted mt">La IA dira que les falta a los resultados seleccionados y por donde empezar.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel"><div class="panel-head"><h3>${icon("sparkles")} Analisis del mercado (IA)</h3>
+    <span class="badge b-info">${esc(res.location)}</span></div>
+    <div class="panel-body"><div class="output">${md(res.analysis || "")}</div></div></div>`;
+}
+
+function detalleHtml(p) {
+  if (!p) return `<p class="muted tiny">Selecciona un resultado.</p>`;
+  return `
+    <div class="flex-between mb">
+      <div><b style="font-size:14.5px">${esc(p.name)}</b>
+        <div class="muted tiny">${esc(p.business_type || "")}</div></div>
+      <span class="badge ${p.score >= 80 ? "b-ok" : p.score >= 60 ? "b-info" : ""}">${p.score}/100</span>
+    </div>
+    <div class="stat-row"><span>Direccion</span><b class="trunc">${esc(p.address)}</b></div>
+    <div class="stat-row"><span>Telefono</span><b>${esc(p.phone)}</b></div>
+    <div class="stat-row"><span>Email</span><b class="trunc">${esc(p.email)}</b></div>
+    <div class="stat-row"><span>Web</span><b class="trunc">${esc(p.website)}</b></div>
+    <div class="stat-row"><span>Tamano</span><b>${esc(p.size)} empleados</b></div>
+    <div class="stat-row"><span>Distancia</span><b>${p.distance} km</b></div>
+    <div class="stat-row"><span>Coordenadas</span><b class="mono tiny">${p.lat}, ${p.lon}</b></div>
+    <div class="stat-row"><span>Problema detectado</span><b>${esc(p.pain)}</b></div>`;
 }
 
 /* ------------------------------------------------------------ PROMPTS */
@@ -548,13 +602,16 @@ VIEWS["seguridad"] = async function (params) {
             [["texto", "Texto / documento"], ["configuracion", "Configuracion"], ["codigo", "Codigo fuente"], ["contrato", "Contrato / legal"]]))}
         ${field("Contenido a analizar *", textarea("content", "", "Pega aqui el texto, codigo o configuracion a revisar...", 9), null, true)}
         <div class="flex">
-          <button class="btn btn-primary" type="submit">${icon("shield")} Ejecutar chequeo</button>
+          <button class="btn btn-primary" type="button" id="btnSecRun">${icon("shield")} Analizar ahora</button>
+          <button class="btn btn-ghost" type="button" id="btnSecSample">${icon("sparkles")} Cargar ejemplo</button>
         </div>
-        <p class="tiny muted">Reglas aplicadas: claves y tokens expuestos, datos personales, URLs sin HTTPS,
-          permisos excesivos, inyeccion SQL, secretos en texto plano e IPs internas.</p>
+        <p class="tiny muted"><b>Se analiza solo</b> 1,5 s despues de que dejes de escribir. Pulsa
+          <b>Analizar ahora</b> para no esperar. Se aplican ${icon("info", 11)} 23 reglas: credenciales y
+          tokens, claves privadas, inyecciones (SQL, comandos, XSS), traversal, CORS, TLS, algoritmos
+          debiles, datos personales, permisos, IP internas y buenas practicas.</p>
       </form></div></div>
     <div id="secOut"><div class="panel"><div class="panel-body">
-      ${empty("shield", "Sin analisis", "Pega contenido a la izquierda y pulsa Ejecutar chequeo para ver el informe.")}
+      ${empty("shield", "Sin analisis", "Pega contenido a la izquierda: el analisis con IA se lanza solo, sin que tengas que pulsar nada.")}
     </div></div></div>
   </div>
 
@@ -703,8 +760,13 @@ mod("kit-marca",{
     field("Audiencia objetivo", input("audience", "", null, "Pymes de 10 a 200 empleados")),
     field("Valores (separados por comas)", input("values", "", null, "cercania, rigor, resultados"), null, true),
     field("Competidores", input("competitors")),
-    field("Descripcion", textarea("description"), null, true),
+    field("Descripcion", textarea("description", "", "A que se dedica, que problema resuelve, en que se diferencia..."), null, true),
   ],
+  formFooter: `<div class="flex" style="margin-top:4px">
+      <button type="button" class="btn btn-primary" id="btnBrandAI">
+        ${icon("sparkles")} Generar la marca con IA</button>
+      <span class="tiny muted">Rellena sola el kit completo con los datos que escribas y previsualiza el resultado.</span>
+    </div>`,
 });
 
 /* ------------------------------------------------------------ ANALIZADOR */

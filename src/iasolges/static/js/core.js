@@ -243,8 +243,9 @@ function select(name, val, opts) {
     return `<option value="${esc(v)}"${String(v) === String(val) ? " selected" : ""}>${esc(t)}</option>`;
   }).join("") + "</select>";
 }
-function textarea(name, val, ph, rows) {
-  return `<textarea name="${name}" rows="${rows || 4}" placeholder="${esc(ph || "")}">${esc(val || "")}</textarea>`;
+function textarea(name, val, ph, rows, id) {
+  return `<textarea name="${name}" id="${esc(id || "inp" + name)}" rows="${rows || 4}"`
+       + ` placeholder="${esc(ph || "")}">${esc(val || "")}</textarea>`;
 }
 
 function copyBtn(getText, label) {

@@ -242,6 +242,8 @@ class Api:
                                             "objective": data.get("objective", ""),
                                             "description": data.get("description", "")})
             out["text"] = txt
+            out["codigo"] = ai.codigo_prompt(data.get("template", ""), data.get("category", "general"),
+                                             data.get("objective", ""))
         elif action == "test_prompt":
             txt = ai.generate(dbp, "Ejecuta esta plantilla y muestra la salida: " + data.get("template", ""),
                               fallback_task="prompt_test",
@@ -278,6 +280,8 @@ class Api:
                                                 "personality", "competitors")}
             out["text"] = ai.generate(dbp, "Crea un kit de marca completo: " + json.dumps(ctx, ensure_ascii=False),
                                       fallback_task="brands", fallback_ctx=ctx)
+            out["campos"] = ai.campos_marca(ctx)
+            out["resumen"] = ai.resumen_marca(ctx)
             d = ai._try_json(out["text"], {}) or {}
             out["record"] = db.create_row(dbp, "brands", {
                 "name": ctx["name"], "sector": ctx["sector"], "values": ctx["values"],
@@ -326,6 +330,20 @@ class Api:
                 "filters": json.dumps(ctx, ensure_ascii=False),
                 "results": json.dumps(res["results"], ensure_ascii=False),
                 "total": res["total"], "ai_analysis": txt})
+        elif action == "geo_detail":
+            res = data.get("resultados", []) or []
+            if not isinstance(res, list) or not res:
+                return {"ok": False, "error": "No hay resultados seleccionados."}
+            res = res[:60]
+            ctx = {"resultados": res,
+                   "localidad": res[0].get("address", "").split(",")[-1].strip(),
+                   "tipos": sorted({str(r.get("business_type", "")) for r in res if r.get("business_type")})}
+            txt = ai.generate(dbp, "Analiza estos resultados de prospeccion local y di que "
+                                   "tienen y que les falta para convertirlos en cliente:\n"
+                                   + json.dumps(ctx, ensure_ascii=False, indent=2),
+                              fallback_task="geo_detail", fallback_ctx=ctx)
+            out["text"] = txt
+            out["analizados"] = len(res)
         elif action == "prospects":
             ctx = {"sector": data.get("sector", "general"), "location": data.get("location", "Madrid"),
                    "limit": _i(data.get("limit"), 15)}
@@ -788,7 +806,8 @@ class Handler(BaseHTTPRequestHandler):
         if parts[0] == "ai" and len(parts) >= 2:
             if method != "POST":
                 return self._json({"error": "Usa POST"}, 405)
-            return self._json(a.ai_action(parts[1], self._body(), q))
+            accion = parts[1].replace("-", "_")
+            return self._json(a.ai_action(accion, self._body(), q))
         if parts[0] == "generator":
             if parts[1] == "program" and method == "POST":
                 return self._json(a.ai_action("program", self._body(), q))
