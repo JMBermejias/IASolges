@@ -114,3 +114,8 @@ Arregla el selector de modelos, que se quedaba vacio al navegar a Configuracion.
 
 Arregla los cuatro modulos indicados. Seguridad: el informe se borraba 50 ms despues de pintarse (la vista se re-renderizaba), ahora se queda; pasa de 10 a 23 reglas de deteccion; y el analisis con IA se lanza solo 1,5 s despues de dejar de escribir, con botones 'Analizar ahora' y 'Cargar ejemplo'. Mapa localizador: los marcadores y las filas no tenian manejador de clic, ahora son seleccionables, con panel de detalle, seleccion multiple y boton 'Analizar seleccion con IA' que dice que tienen y que les falta a los resultados. Generador de prompts: al describir la idea se genera solo el prompt en codigo. Kit de marca: boton 'Generar la marca con IA' dentro del formulario de nueva marca, que rellena los campos deducidos y muestra la previsualizacion.
 
+
+## [1.3.4] - 2026-10-15
+
+Arregla el Mapa Localizador: el analisis de mercado mostraba JSON crudo en vez del informe, y los puntos del mapa se deformaban en elipses gigantes porque el SVG usaba preserveAspectRatio none. El boton Analizar seleccion con IA ahora muestra el resultado en el propio panel de detalle, junto al boton, con contador de seleccionados y boton de copiar. Reescribe el renderizador de Markdown por lineas: las listas partidas en varias lineas reiniciaban la numeracion y los parrafos se mezclaban con las listas.
+

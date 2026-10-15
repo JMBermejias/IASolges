@@ -333,6 +333,7 @@ def local_generate(task, prompt, ctx=None):
         "names": _ll_names,
         "analyze": _ll_analyze,
         "geo": _ll_geo,
+        "geo_analysis": _ll_geo_analysis,
         "geo_detail": _ll_geo_detail,
         "prospects": _ll_prospects,
         "campaign": _ll_campaign,
@@ -1016,6 +1017,64 @@ PAINS = ["el seguimiento manual", "los presupuestos lentos", "la dispersion de d
          "la captacion impredecible", "el trabajo duplicado"]
 
 
+
+
+def _ll_geo_analysis(prompt, ctx):
+    """Informe de mercado en Markdown. Devuelve solo texto (nunca un dict)."""
+    sector = (ctx.get("sector") or "general").lower()
+    ubic = ctx.get("location") or "la zona"
+    radius = ctx.get("radius") or 10
+    sc = _sector_ctx(sector)
+    tipos = TIPOS.get(sector, GENERIC)[:4]
+
+    return f"""# Lectura del mercado: {ubic}
+
+**Sector:** {sector} · **Radio:** {radius} km
+
+## Densidad de oportunidades
+
+Con un radio de {radius} km alrededor de {ubic} el sector {sector} concentra
+negocios de {_pick(tipos, 0).lower()}, {_pick(tipos, 1).lower()} y
+{_pick(tipos, 2).lower()}. El perfil mas rentable es el de **10 a 50 empleados**:
+tiene presupuesto suficiente y decide el mismo dueño, sin comites.
+
+## Tipos de negocio objetivo
+
+| Tipo | Por que interesa |
+|---|---|
+{chr(10).join(f"| {_pick(tipos, i)} | {motivo} |" for i, motivo in enumerate([
+    "Ticket medio alto y decision rapida",
+    "Margen ajustado por costes, cabe la propuesta",
+    "Necesita ordenar procesos internos",
+    "Crece y todavia no tiene equipo de sistemas"], 4))}
+
+## Senales que deberian buscar
+
+- **No tienen web o la tienen parada** → necesitan presencia digital.
+- **Cuentas en redes sociales sin actividad desde hace meses** → presupuesto
+  libertad y competitor directo.
+- **No responden a reseñas** → marca sin community manager.
+- **Cobran en efectivo o sin TPV** → gestion digitalizada pendiente.
+
+## Metrica que decide la venta
+
+Medir antes de proponer: {_pick(sc["metricas"], 0)} y {_pick(sc["metricas"], 1)}.
+Si el negocio no mide esas dos variables, la primera propuesta no debe ser
+tecnica: debe ser un panel que las mida.
+
+## Secuencia de contacto sugerida
+
+1. **Dia 1-2** — Llamada de descubrimiento de 3 minutos. Objetivo: saber quien decide.
+2. **Dia 3-5** — Email con un caso del sector, no con tu catalogo.
+3. **Dia 6-9** — Visita de 20 minutos con mini-diagnostico gratuito.
+4. **Dia 10** — Propuesta de una pagina, con precio cerrado.
+5. **Dia 21** — Seguimiento con fecha concreta, no con "te escribo".
+
+## Aviso importante
+
+Estos datos son de muestra, generados para **planificar**, no para contactar.
+Verifica siempre telefono, email y web antes de escribir: un contacto erroneo
+quema la relacion en el primer envio."""
 
 def _ll_geo_detail(prompt, ctx):
     """Que tienen y que les falta a los resultados de prospeccion."""

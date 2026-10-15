@@ -144,62 +144,112 @@ const Modal = {
 };
 
 /* ------------------------------------------------------------ MARKDOWN */
+/* ==================== MARKDOWN ==================== */
+/** Formato en linea: negrita, cursiva, codigo y enlaces. */
+function inline(t) {
+  return String(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+
+/**
+ * Renderizador de Markdown por lineas.
+ * Se hizo asi (y no con una cadena de replaces) porque las listas partidas en
+ * varias lineas reiniciaban la numeracion y las tablas se colaban en ellas.
+ */
 function md(src) {
   if (!src) return '<p class="muted">Sin contenido.</p>';
-  const esc2 = esc(src);
-  // bloques de codigo primero
-  const blocks = [];
-  let s = esc2.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
-    blocks.push(code.trim());
-    return " CODE" + (blocks.length - 1) + " ";
+
+  const bloques = [];
+  let t = esc(src).replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+    bloques.push(code.trim());
+    return "\n\n@@CODE" + (bloques.length - 1) + "@@\n\n";
   });
-  s = s.replace(/^### (.*)$/gm, "<h3>$1</h3>")
-       .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-       .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-       .replace(/^---$/gm, "<hr>")
-       .replace(/^(\s*)[-*] (.*)$/gm, "<li>$2</li>")
-       .replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ul>$1</ul>")
-       .replace(/^(\s*)(\d+)\. (.*)$/gm, function (m, sp, n, t) { return "<li>" + t + "</li>"; })
-       .replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ol>$1</ol>")
-       .replace(/^\|?(.*)\|(.*)$/gm, function (m) {
-         const cells = m.split("|").slice(1, -1).map(c => c.trim());
-         if (cells.every(c => /^:?-{2,}:?$/.test(c))) return " TB ";
-         return " TR " + cells.join(" ");
-       });
-  // reconstruye tablas
-  const lines = s.split("\n");
-  let out = [], inTable = false;
-  for (const ln of lines) {
-    if (ln.startsWith(" TR ")) {
-      const cells = ln.slice(4).split(" ");
-      if (!inTable) { out.push("<table><thead><tr>" + cells.map(c => "<th>" + c + "</th>").join("") + "</tr></thead><tbody>"); inTable = true; }
-      else out.push("<tr>" + cells.map(c => "<td>" + c + "</td>").join("") + "</tr>");
+
+  const out = [];
+  let parrafo = [];
+  let lista = null;          // "ul" | "ol"
+  let tabla = null;          // {cabecera, filas}
+
+  const cerrarParrafo = () => {
+    if (parrafo.length) {
+      out.push("<p>" + inline(parrafo.join(" ")).trim() + "</p>");
+      parrafo = [];
+    }
+  };
+  const cerrarLista = () => {
+    if (lista) { out.push("</" + lista + ">"); lista = null; }
+  };
+  const cerrarTabla = () => {
+    if (tabla) {
+      out.push("<tbody>" + tabla.filas.join("") + "</tbody></table>");
+      tabla = null;
+    }
+  };
+  const cerrarTodo = () => { cerrarParrafo(); cerrarLista(); cerrarTabla(); };
+
+  const celdas = l => l.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+  const esSeparador = l => /^\|?[\s:|-]+\|?$/.test(l) && l.includes("-");
+
+  for (const raw of t.split("\n")) {
+    const l = raw.trim();
+
+    if (!l) { cerrarTodo(); continue; }
+
+    let m;
+    if ((m = /^@@CODE(\d+)@@$/.exec(l))) {
+      cerrarTodo();
+      out.push("@@CODEBLOCK" + m[1] + "@@");
       continue;
     }
-    if (ln === " TB ") continue;
-    if (inTable) {
-      // dentro de una tabla las lineas vacias no deben producir <br>
-      if (!ln.trim()) continue;
-      out.push("</tbody></table>"); inTable = false;
+    if (/^###\s+/.test(l)) { cerrarTodo(); out.push("<h3>" + inline(l.replace(/^###\s+/, "")) + "</h3>"); continue; }
+    if (/^##\s+/.test(l))  { cerrarTodo(); out.push("<h2>" + inline(l.replace(/^##\s+/, "")) + "</h2>"); continue; }
+    if (/^#\s+/.test(l))   { cerrarTodo(); out.push("<h1>" + inline(l.replace(/^#\s+/, "")) + "</h1>"); continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(l)) { cerrarTodo(); out.push("<hr>"); continue; }
+    if (/^&gt;\s?/.test(l)) {
+      cerrarTodo();
+      out.push("<blockquote>" + inline(l.replace(/^&gt;\s?/, "")) + "</blockquote>");
+      continue;
     }
-    out.push(ln);
+
+    // ---- tablas
+    if (l.startsWith("|")) {
+      cerrarParrafo(); cerrarLista();
+      const cs = celdas(l);
+      if (esSeparador(l)) continue;                       // linea de guiones
+      if (!tabla) {
+        tabla = { cabecera: cs, filas: [] };
+        out.push("<table><thead><tr>" + cs.map(c => "<th>" + inline(c) + "</th>").join("") + "</tr></thead>");
+      } else {
+        tabla.filas.push("<tr>" + cs.map(c => "<td>" + inline(c) + "</td>").join("") + "</tr>");
+      }
+      continue;
+    }
+    cerrarTabla();
+
+    // ---- listas
+    if ((m = /^([-*]|\d+\.)\s+(.*)$/.exec(l))) {
+      cerrarParrafo();
+      const tipo = /\d/.test(m[1]) ? "ol" : "ul";
+      if (lista !== tipo) { cerrarLista(); out.push("<" + tipo + ">"); lista = tipo; }
+      out.push("<li>" + inline(m[2]) + "</li>");
+      continue;
+    }
+    // continuacion del elemento anterior
+    if (lista && out.length && out[out.length - 1].startsWith("<li")) {
+      out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, " " + inline(l) + "</li>");
+      continue;
+    }
+    cerrarLista();
+    parrafo.push(l);
   }
-  if (inTable) out.push("</tbody></table>");
-  s = out.join("\n");
-  // inline
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>")
-       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-       .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
-       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  // restaura bloques de codigo antes de unir lineas
-  s = s.replace(/ CODE(\d+) /g, (m, i) => "<pre><code>" + blocks[+i] + "</code></pre>");
-  s = s.replace(/^&gt;\s*(.*)$/gm, "<blockquote>$1</blockquote>");
-  // une con <br> solo las lineas que no son bloques
-  const BLOCK = /^(<h1|<h2|<h3|<hr|<ul|<ol|<li|<table|<tbody|<thead|<tr|<th|<td|<\/table>|<\/ul>|<\/ol>|<\/blockquote>|<pre)/;
-  const ls = s.split("\n").filter(l => l.trim() !== "");
-  s = ls.map((l, i) => (BLOCK.test(l) || i === ls.length - 1) ? l : l + "<br>").join("");
-  if (!/^<(h1|h2|h3|p|ul|ol|table|pre|blockquote|hr)/.test(s)) s = "<p>" + s + "</p>";
-  return s;
+  cerrarTodo();
+
+  let html = out.join("\n").replace(/@@CODEBLOCK(\d+)@@/g,
+    (m, i) => "<pre><code>" + bloques[+i] + "</code></pre>");
+  return html || '<p class="muted">Sin contenido.</p>';
 }
 
 /* ------------------------------------------------------------ UI HELPERS */

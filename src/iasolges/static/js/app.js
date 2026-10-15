@@ -914,6 +914,13 @@ const Geo = {
     Geo.pintarDetalle(0);
   },
 
+  contador() {
+    const c = $("#geoSelCount");
+    if (c) c.textContent = Geo.seleccion.size
+      ? `${Geo.seleccion.size} seleccionado${Geo.seleccion.size === 1 ? "" : "s"}`
+      : "Nada seleccionado";
+  },
+
   marcados() {
     document.querySelectorAll("#geoBody tr").forEach(tr => {
       const i = tr.dataset.idx;
@@ -924,6 +931,7 @@ const Geo = {
       m.style.opacity = Geo.seleccion.size === 0 ? ".45" : (sel ? "1" : ".35");
       m.style.transform = sel ? "scale(1.35)" : "scale(1)";
     });
+    Geo.contador();
   },
 
   alternar(i) {
@@ -944,6 +952,7 @@ const Geo = {
     document.querySelectorAll("[data-chk]").forEach(c => { c.checked = v; });
     Geo.marcados();
     if (v) Geo.pintarDetalle(0);
+    Geo.contador();
   },
 
   /** Analiza con IA lo que los resultados seleccionados tienen y lo que les falta. */
@@ -954,14 +963,21 @@ const Geo = {
     const btn = $("#btnGeoAI");
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Analizando...'; }
     const salida = $("#geoAI");
-    if (salida) salida.innerHTML = `<div class="loading"><span class="spin dark"></span>
-       Analizando ${picked.length} resultado(s) con la IA...</div>`;
+    if (salida) salida.innerHTML = `<div class="loading" style="padding:18px">
+       <span class="spin dark"></span> Analizando ${picked.length} resultado(s)...</div>`;
     try {
       const r = await Api.post("/api/ai/geo-detail", { resultados: picked });
-      if (salida) salida.innerHTML = `<div class="output">${md(r.text)}</div>`;
-      if (salida) salida.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (salida) {
+        salida.innerHTML = `
+          <div class="section-title" style="margin-top:6px"><h3>Analisis de la seleccion</h3>
+            <div class="line"></div>
+            <button class="btn btn-ghost btn-sm" id="geoCopyAI">${icon("copy")} Copiar</button></div>
+          <div class="output">${md(r.text)}</div>`;
+        const cp = $("#geoCopyAI");
+        if (cp) cp.onclick = () => doCopy(r.text, "Analisis");
+      }
     } catch (e) {
-      if (salida) salida.innerHTML = empty("alert", "Error", e.message);
+      if (salida) salida.innerHTML = empty("alert", "No se pudo analizar", e.message);
     }
     if (btn) { btn.disabled = false; btn.innerHTML = icon("sparkles") + " Analizar seleccion con IA"; }
   },
@@ -1060,8 +1076,7 @@ document.addEventListener("submit", async (e) => {
       Buscando oportunidades y analizando el mercado...</div>`;
     try {
       const r = await Api.post("/api/ai/geo", d);
-      $("#geoResult").innerHTML =
-        `<div id="geoAI" class="mb"></div>` + mapHtml({ location: r.location, radius: r.radius,
+      $("#geoResult").innerHTML = mapHtml({ location: r.location, radius: r.radius,
         sector: r.sector, results: r.results, analysis: r.analysis });
       Geo.montar(r.results);
       toast(r.results.length + " oportunidades encontradas", "ok");

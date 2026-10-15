@@ -469,16 +469,18 @@ function mapHtml(res) {
   const sy = v => H - ((v - minLon + pad) / ((maxLon - minLon) + pad * 2 || 1)) * H;
 
   const color = sc => (sc >= 80 ? "#5C8C72" : sc >= 60 ? "#6E9CC4" : "#A9BCCC");
-  const r = sc => 2.0 + (sc / 100) * 2.6;
+  const r = sc => 0.9 + (sc / 100) * 1.0;
 
+  // Radio del halo de seleccion, tambien en unidades del viewBox.
+  const R = 2.4;
   const markers = pts.map((p, i) => `
     <g class="marker" data-idx="${i}" tabindex="0" role="button"
        aria-label="${esc(p.name)}">
+      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${R}" fill="${color(p.score)}"
+              fill-opacity=".14" class="halo"/>
       <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r(p.score)}" fill="${color(p.score)}"
-              fill-opacity=".85" stroke="#fff" stroke-width="1"/>
-      <circle cx="${sx(p.lat)}" cy="${sy(p.lon)}" r="${r(p.score) + 2.5}" fill="none"
-              stroke="${color(p.score)}" stroke-width=".4" opacity=".45"/>
-      <title>${esc(p.name)} — ${p.score}/100\n${esc(p.address)}</title>
+              fill-opacity=".92" stroke="#fff" stroke-width=".45"/>
+      <title>${esc(p.name)} - ${p.score}/100\n${esc(p.address)}</title>
     </g>`).join("");
 
   return `
@@ -487,7 +489,7 @@ function mapHtml(res) {
     <span class="muted tiny">Pulsa un punto o una fila para ver el detalle</span></div>
 
   <div class="map-wrap mb">
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none">${markers}</svg>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${markers}</svg>
     <div class="map-legend">
       <div><i style="background:#5C8C72"></i>Alta prioridad (&gt;80)</div>
       <div><i style="background:#6E9CC4"></i>Media (60–80)</div>
@@ -524,10 +526,12 @@ function mapHtml(res) {
         <h3>${icon("info")} Detalle del resultado</h3></div>
       <div class="panel-body" id="geoDetailBody">${detalleHtml(pts[0])}</div>
       <div class="panel-body" style="border-top:1px solid var(--line)">
-        <div class="flex">
+        <div class="flex-between mb">
           <button class="btn btn-primary" id="btnGeoAI">${icon("sparkles")} Analizar seleccion con IA</button>
+          <span class="muted tiny" id="geoSelCount"></span>
         </div>
-        <p class="tiny muted mt">La IA dira que les falta a los resultados seleccionados y por donde empezar.</p>
+        <p class="tiny muted mb">La IA dira que tienen y que les falta a los resultados seleccionados.</p>
+        <div id="geoAI"></div>
       </div>
     </div>
   </div>

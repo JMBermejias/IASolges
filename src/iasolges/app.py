@@ -319,9 +319,11 @@ class Api:
                    "business_type": data.get("business_type", ""),
                    "limit": _i(data.get("limit"), 20)}
             res = ai.local_generate("geo", "", ctx)
+            # El analisis va aparte: local_generate("geo") devuelve un dict con
+            # resultados+analisis, y pasarlo por generate() lo serializaba a JSON.
             txt = ai.generate(dbp, f"Analiza el mercado local de {ctx['location']} en el sector "
                                    f"{ctx['sector']} con {res['total']} resultados.",
-                              fallback_task="geo", fallback_ctx=ctx)
+                              fallback_task="geo_analysis", fallback_ctx=ctx)
             res["analysis"] = txt
             out.update(res)
             out["record"] = db.create_row(dbp, "geo_searches", {
