@@ -73,6 +73,11 @@ def _safe_order(order, fields):
 class Api:
     def __init__(self, db_path, on_shutdown=None):
         self.db = db_path
+        # La cache de OpenStreetMap va SIEMPRE junto a la base de datos. Antes
+        # solo se fijaba cuando se pasaba --data-dir, y la app instalada (que no
+        # lo pasa) se quedaba sin cache: la busqueda real fallaba y salian
+        # datos inventados sin avisar.
+        osm.fijar_cache(os.path.join(os.path.dirname(os.path.abspath(db_path)), "cache"))
         # Se inyecta desde create_server: detiene el servidor al salir.
         self.on_shutdown = on_shutdown or (lambda: None)
         self.puerto = 0

@@ -454,7 +454,9 @@ const TIPOS_MAPA = {
 };
 
 VIEWS["mapa"] = async function (params) {
-  const sector = (params.sector || "general").toLowerCase();
+  let sector = (params.sector || "general").toLowerCase();
+  let tipoNegocio = params.tipo || "";
+  let origen = params.origen || "real";
   const q = params.q || {};
   const rows = await fetchList("geo_searches", { limit: "50" });
   let res = null;
@@ -471,6 +473,12 @@ VIEWS["mapa"] = async function (params) {
       // seleccion: sin esto, al reabrir una busqueda guardada los marcadores
       // no respondian y "Analizar seleccion" no tenia nada que enviar.
       res.aviso = g.aviso || "";
+      // El formulario tiene que reflejar la busqueda guardada, no el valor por
+      // defecto: si no, al reabrir dice "Cualquier sector" aunque se haya
+      // buscado en "construccion".
+      sector = (g.sector || "general").toLowerCase();
+      tipoNegocio = g.business_type || "";
+      origen = /OpenStreetMap/i.test(g.fuente || "") ? "real" : "muestra";
       GeoPendiente = { id: g.id, results: res.results, analysis: g.ai_analysis || "" };
     } catch (e) {}
   }
@@ -485,12 +493,12 @@ VIEWS["mapa"] = async function (params) {
           ${field("Localidad *", input("location", res ? res.location : "Madrid", "text", "Ciudad o zona"))}
           ${field("Radio (km)", input("radius", res ? res.radius : 10, "number", "10", "1"))}
           ${field("Sector", select("sector", sector, SECTORS.map(x => [x, ETIQUETA_SECTOR[x] || x])), "", true)}
-          ${field("Tipo de negocio", select("business_type", "", TIPOS_MAPA[sector] || []),
+          ${field("Tipo de negocio", select("business_type", tipoNegocio, TIPOS_MAPA[sector] || []),
                   "Se rellena con las actividades reales de la zona")}
           ${field("Numero de resultados", input("limit", 20, "number", "20", "1"))}
         </div>
         <div class="form-grid">
-          ${field("Origen de los datos", select("origin", "real",
+          ${field("Origen de los datos", select("origin", origen,
               [["real", "Reales (OpenStreetMap)"], ["muestra", "Muestra del Motor IA"]]),
               "Reales trae nombres y direcciones que existen de verdad")}
         </div>

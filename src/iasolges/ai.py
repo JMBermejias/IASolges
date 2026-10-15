@@ -1017,7 +1017,8 @@ def _ll_geo(prompt, ctx):
             from . import osm
             reales, clat, clon = osm.buscar_reales(loc, sector, radius, n, ftype)
         except Exception as e:
-            reales, motivo = [], str(e).strip().rstrip(".")
+            from . import osm as _osm
+            reales, motivo = [], _osm.motivo_amigable(e)
         if reales:
             if len(reales) < min(n, 5):
                 aviso = ("Solo se han encontrado **%d** negocios reales de este sector en "

@@ -100,6 +100,7 @@ if ! curl -sf "http://127.0.0.1:${PUERTO_TEST}/api/ping" >/dev/null 2>&1; then
   cat /tmp/iasolges-test.log >&2
   exit 1
 fi
+python3 tests/test_cache_osm.py | tail -3
 python3 tests/test_api.py "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 node tests/test_views.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 
@@ -108,11 +109,11 @@ if node -e "require('jsdom')" >/dev/null 2>&1; then
     echo "  Ejecutando pruebas de DOM (jsdom)..."
     node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     node tests/test_modules_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_modelo_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_seguridad_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_modelo_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_seguridad_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
 else
     CACHE_JS="${TMPDIR:-/tmp}/iasolges-jsdom"
     echo "  Instalando jsdom en $CACHE_JS para la prueba de DOM..."
@@ -121,11 +122,11 @@ else
     if [ -d "$CACHE_JS/node_modules/jsdom" ]; then
         node tests/test_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
         node tests/test_modules_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_modelo_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_seguridad_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
-        node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_modelo_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_seguridad_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_real_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
+    node tests/test_mapa_honesto_dom.mjs "http://127.0.0.1:${PUERTO_TEST}" | tail -3
     else
         echo "  AVISO: no se pudo instalar jsdom; se omite la prueba de DOM."
     fi

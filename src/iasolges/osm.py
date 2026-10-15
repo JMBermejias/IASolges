@@ -111,8 +111,14 @@ class OSMError(Exception):
 
 
 def fijar_cache(directorio):
+    """Indica donde se guardan las consultas. Siempre debe llamarse: sin esto
+    se usa una cache en memoria que antes devolvia mal los valores."""
     global CACHE_DIR
     CACHE_DIR = directorio
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+    except OSError:
+        pass
 
 
 def _throttle():
@@ -131,8 +137,9 @@ def _clave_cache(*partes):
 
 def _cache_leer(clave):
     if not CACHE_DIR:
+        # Devuelve el VALOR, no la tupla (fecha, valor) que se guarda.
         c = _cache.get(clave)
-        return c if (c and time.time() - c[0] < CACHE_TTL) else None
+        return (c[1] if (c and time.time() - c[0] < CACHE_TTL) else None)
     ruta = os.path.join(CACHE_DIR, "osm_%s.json" % clave)
     try:
         if os.path.exists(ruta) and time.time() - os.path.getmtime(ruta) < CACHE_TTL:
@@ -278,6 +285,27 @@ def buscar_reales(localidad, sector, radio, limite=20, tipo=""):
 
     salida = sorted(vistos.values(), key=lambda r: r["distance"])[:limite]
     return salida, lat, lon
+
+
+def motivo_amigable(e):
+    """Convierte un fallo tecnico en algo que un comercial pueda entender."""
+    if isinstance(e, OSMError):
+        return str(e).strip().rstrip(".")
+    if isinstance(e, urllib.error.HTTPError):
+        if e.code == 429:
+            return ("OpenStreetMap esta limitando las peticiones desde esta conexion "
+                    "(codigo 429). Es temporal: espera unos minutos y vuelve a buscar.")
+        if e.code == 403:
+            return ("OpenStreetMap ha bloqueado las peticiones desde esta conexion "
+                    "(codigo 403). Prueba otra conexion.")
+        return "OpenStreetMap respondio con un error (codigo %s)." % e.code
+    if isinstance(e, urllib.error.URLError):
+        return ("No se pudo contactar con OpenStreetMap: %s. Revisa la conexion a internet."
+                % (getattr(e, "reason", None) or "sin respuesta"))
+    if isinstance(e, TimeoutError):
+        return ("OpenStreetMap tardo demasiado en responder. Revisa la conexion "
+                "y vuelve a intentarlo.")
+    return "No se pudo completar la busqueda (%s)." % type(e).__name__
 
 
 def _etiqueta(cat, sub, clave, sector):
