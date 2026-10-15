@@ -407,14 +407,24 @@ VIEWS["favoritos"] = async function () {
 };
 
 /* ------------------------------------------------------------ MAPA */
+/** Resultados de la busqueda abierta: los necesita afterRender para montar el mapa. */
+let GeoPendiente = null;
+
 VIEWS["mapa"] = async function (params) {
   const q = params.q || {};
   const rows = await fetchList("geo_searches", { limit: "50" });
   let res = null;
+  GeoPendiente = null;
   if (params.id) {
     const g = await Api.get("/api/geo_searches/" + params.id);
-    try { res = { results: JSON.parse(g.results), analysis: g.ai_analysis, location: g.location,
-                 radius: g.radius, sector: g.sector, center: null }; } catch (e) {}
+    try {
+      res = { results: JSON.parse(g.results), analysis: g.ai_analysis, location: g.location,
+              radius: g.radius, sector: g.sector, center: null };
+      // Guardamos los resultados para que afterRender monte el mapa y la
+      // seleccion: sin esto, al reabrir una busqueda guardada los marcadores
+      // no respondian y "Analizar seleccion" no tenia nada que enviar.
+      GeoPendiente = { id: g.id, results: res.results, analysis: g.ai_analysis || "" };
+    } catch (e) {}
   }
   return `
   <div class="page-head"><div><h2>Mapa Localizador de Clientes</h2>

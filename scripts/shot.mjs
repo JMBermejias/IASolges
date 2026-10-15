@@ -37,7 +37,8 @@ await wait(1000);
 const d = window.document;
 if (d.querySelector("#layout").hidden) await window.eval("window.__X.boot()");
 await wait(2000);
-await window.eval(`window.__X.go(${JSON.stringify(route)}, {})`);
+const params = process.argv[5] ? JSON.parse(process.argv[5]) : {};
+await window.eval(`window.__X.go(${JSON.stringify(route)}, ${JSON.stringify(params)})`);
 await wait(2600);
 
 const doc = d.documentElement.cloneNode(true);

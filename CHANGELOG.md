@@ -129,3 +129,8 @@ Arregla el guardado del modelo y la ortografia. Al elegir un modelo del desplega
 
 Anade el selector de tipo de analisis en Chequeo de Seguridad, que antes no existia y solo se anunciaba en un texto pequeno. Ahora hay dos opciones: 'Automatico con IA' (por defecto, analiza solo 1,5 s despues de escribir) y 'Manual' (espera a que pulses Analizar ahora). El aviso bajo el desplegable indica el modo activo y lo que esta haciendo. El campo Titulo ya no viene con 'Chequeo manual' por defecto. Añade el boton Reanalizar. Corrige dos detalles de la v1.3.5: el icono de informacion salia relleno en negro y el lateral seguia mostrando el texto largo del motor en vez del nombre corto con el modelo debajo.
 
+
+## [1.3.7] - 2026-10-15
+
+Arregla el Mapa Localizador de Clientes. Al abrir una busqueda guardada el mapa se dibujaba pero no respondia: no se montaba Geo, asi que la seleccion estaba vacia, los marcadores no hacian nada y 'Analizar seleccion con IA' se quejaba de que no habia nada elegido. Ahora afterRender monta el mapa y la seleccion al reabrir una busqueda. Ademas, las busquedas guardadas por versiones antiguas tienen el analisis guardado como volcado JSON en vez de informe; ahora se detecta y se regenera solo, sin perder la busqueda. Corrige dos errores de la v1.3.6 que rompian la vista del mapa al ejecutar las pruebas.
+

@@ -91,6 +91,16 @@ function afterRender(route) {
     try { initSelectorModelos(); } catch (e) { console.error("selector modelos", e); }
   }
 
+  if (route === "mapa") {
+    // Sin esto, al abrir una busqueda guardada el mapa salia dibujado pero
+    // Geo.resultados seguia vacio: no habia seleccion ni detalle, y el boton
+    // "Analizar seleccion con IA" se quejaba de que no havia nada elegido.
+    if (GeoPendiente && GeoPendiente.results && GeoPendiente.results.length) {
+      Geo.montar(GeoPendiente.results);
+      repararAnalisisGeo(GeoPendiente);
+    }
+  }
+
   if (route === "seguridad") {
     const ta = $("#secForm [name=content]");
     if (ta) ta.oninput = () => Security.alCambiar(ta);
@@ -1140,6 +1150,7 @@ document.addEventListener("submit", async (e) => {
       const r = await Api.post("/api/ai/geo", d);
       $("#geoResult").innerHTML = mapHtml({ location: r.location, radius: r.radius,
         sector: r.sector, results: r.results, analysis: r.analysis });
+      GeoPendiente = { id: r.record && r.record.id, results: r.results, analysis: r.analysis || "" };
       Geo.montar(r.results);
       toast(r.results.length + " oportunidades encontradas", "ok");
     } catch (er) {
@@ -1633,6 +1644,22 @@ function pintarMotor(info) {
     box.classList.toggle("remote", info.provider !== "local");
     box.title = `Motor: ${info.label}\nModelo: ${info.model || "-"}\n`
               + `Temperatura: ${info.temperature ?? "-"}`;
+  }
+}
+
+/** Arregla busquedas guardadas cuyo analisis es un volcado JSON de una version
+ *  antigua, en vez del informe en Markdown. Se regenera y se guarda. */
+async function repararAnalisisGeo(pend) {
+  const roto = /^\s*[{[]/.test(String(pend.analysis || ""));
+  if (!roto || !pend.results || !pend.results.length) return;
+  try {
+    const r = await Api.post("/api/ai/geo-detail", { resultados: pend.results.slice(0, 40) });
+    const salida = $("#geoResult .output");
+    if (salida) salida.innerHTML = md(r.text);
+    await Api.put("/api/geo_searches/" + pend.id, { ai_analysis: r.text });
+    toast("Analisis del mercado regenerado", "ok");
+  } catch (e) {
+    console.warn("no se pudo reparar el analisis", e);
   }
 }
 
