@@ -119,3 +119,8 @@ Arregla los cuatro modulos indicados. Seguridad: el informe se borraba 50 ms des
 
 Arregla el Mapa Localizador: el analisis de mercado mostraba JSON crudo en vez del informe, y los puntos del mapa se deformaban en elipses gigantes porque el SVG usaba preserveAspectRatio none. El boton Analizar seleccion con IA ahora muestra el resultado en el propio panel de detalle, junto al boton, con contador de seleccionados y boton de copiar. Reescribe el renderizador de Markdown por lineas: las listas partidas en varias lineas reiniciaban la numeracion y los parrafos se mezclaban con las listas.
 
+
+## [1.3.5] - 2026-10-15
+
+Arregla el guardado del modelo y la ortografia. Al elegir un modelo del desplegable y guardar, se conservaba el anterior porque el campo de texto manual siempre sobreescribia la eleccion; ahora solo cuenta si se elige la opcion de escribirlo a mano. Anade indicadores visibles: el modelo en uso aparece al pie de la barra lateral y en Configuracion > Informacion, y el aviso de guardado dice que modelo se ha guardado. Corrige la ortografia de 'campana' por 'campaña' en toda la interfaz.
+

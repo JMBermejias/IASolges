@@ -596,21 +596,21 @@ async function runAI(action, host) {
   }
 
   if (action === "campaign") {
-    Modal.open("Generador de campanas", `<form class="form" id="cForm"><div class="form-grid">
-      ${field("Nombre de la campana *", input("name", ""))}
+    Modal.open("Generador de campañas", `<form class="form" id="cForm"><div class="form-grid">
+      ${field("Nombre de la campaña *", input("name", ""))}
       ${field("Objetivo *", input("objective", "", null, "Aumentar la captacion"))}
       ${field("Canal", select("channel", "multicanal", ["multicanal", "email", "linkedin", "seo", "paid", "telefono", "eventos"]))}
       ${field("Sector", select("sector", "general", SECTORS.map(s => [s, s])))}
       ${field("Ciudad", input("city", ""))}
       ${field("Presupuesto (EUR)", input("budget", 0, "number", "0", "0.01"))}
-      </div><label class="check"><input type="checkbox" name="save" checked> Guardar en Campanas</label></form>`,
+      </div><label class="check"><input type="checkbox" name="save" checked> Guardar en Campañas</label></form>`,
       `<button class="btn btn-ghost left" data-close>Cancelar</button>
        <button class="btn btn-primary" id="cRun">${icon("megaphone")} Generar</button>`);
     $("#cRun").onclick = async () => {
       const b = $("#cRun"); b.disabled = true; b.innerHTML = '<span class="spin"></span> Generando...';
       try {
         const r = await Api.post("/api/ai/campaign", Object.fromEntries(new FormData($("#cForm")).entries()));
-        Modal.open("Campana generada", `
+        Modal.open("Campaña generada", `
           <div class="section-title"><h3>Estrategia</h3><div class="line"></div></div>
           <div class="output mb">${md(r.strategy)}</div>
           <div class="section-title"><h3>Copy listo para publicar</h3><div class="line"></div></div>
@@ -620,7 +620,7 @@ async function runAI(action, host) {
           `<button class="btn btn-ghost left" data-close>Cerrar</button>
            <button class="btn btn-ghost" id="cCopy">${icon("copy")} Copiar todo</button>
            <button class="btn btn-primary" data-close>Guardar y cerrar</button>`, true);
-        $("#cCopy").onclick = () => doCopy(r.strategy + "\n\n" + r.copy + "\n\n" + r.schedule, "Campana");
+        $("#cCopy").onclick = () => doCopy(r.strategy + "\n\n" + r.copy + "\n\n" + r.schedule, "Campaña");
       } catch (e) { toast(e.message, "err"); }
       b.disabled = false; b.innerHTML = icon("megaphone") + " Generar";
     };
@@ -1148,9 +1148,12 @@ VIEWS["settings"] = async function () {
             ${field("Tokens maximos", input("ai_max_tokens", s.ai_max_tokens, "number", "2000", "100"))}
           </div>
           <div class="flex-between mb" id="modelInfo" style="font-size:12px"></div>
-          <div class="flex">
-            <button class="btn btn-primary" type="submit">${icon("save")} Guardar configuracion</button>
-            <button class="btn btn-ghost" id="btnReloadModels">${icon("refresh")} Recargar modelos</button>
+          <div class="flex-between">
+            <div class="flex">
+              <button class="btn btn-primary" type="submit">${icon("save")} Guardar configuracion</button>
+              <button class="btn btn-ghost" id="btnReloadModels">${icon("refresh")} Recargar modelos</button>
+            </div>
+            <span class="tiny muted">Guardado ahora: <b class="mono" id="modelGuardado">${esc(s.ai_model)}</b></span>
           </div>
         </form>
       </div></div>
@@ -1171,6 +1174,7 @@ VIEWS["settings"] = async function () {
         <div class="section-title"><h3>Informacion</h3><div class="line"></div></div>
         <div class="stat-row"><span>Version</span><b>${esc(s.version)}</b></div>
         <div class="stat-row"><span>Motor activo</span><b>${esc(s.ai_provider_info.label)}</b></div>
+        <div class="stat-row"><span>Modelo en uso</span><b class="mono">${esc(s.ai_model_activo || s.ai_model)}</b></div>
         <div class="stat-row"><span>Servidor</span><b class="mono">127.0.0.1</b></div>
         <div class="stat-row"><span>Datos locales</span><b class="mono">~/.local/share/iasolges</b></div>
         <div class="flex mt">
@@ -1513,7 +1517,8 @@ function pintarModelos(info, actual) {
   sel.appendChild(libreOpt);
   const actualVisible = lista.some(m => m.id === actual);
   sel.value = actualVisible ? actual : OPCION_LIBRE;
-  if (!actualVisible && actual) libre.value = actual;
+  if (actualVisible) libre.value = "";          // manda el desplegable
+  else if (actual) libre.value = actual;       // modelo propio: va en el campo
   libre.style.display = sel.value === OPCION_LIBRE ? "" : "none";
 
   const info2 = $("#modelInfo");
@@ -1543,15 +1548,30 @@ function initSelectorModelos() {
   if (typeof pintarModelos !== "function") return;
   const sel = $("#selModelo");
   if (!sel) return;
-  const libre0 = $("#inpModeloLibre");
-  pintarModelos(estadoModelos.info || {}, (libre0 && libre0.value) || "");
+  pintarModelos(estadoModelos.info || {}, sel.dataset.actual || "");
   const selProv = $("#setForm [name=ai_provider]");
   if (selProv) selProv.onchange = () => recargarModelos(selProv.value);
   const libre = $("#inpModeloLibre");
-  if (libre && !libre.value) libre.value = sel.dataset.actual || "";
   sel.onchange = () => {
-    if (libre) libre.style.display = sel.value === "__libre__" ? "" : "none";
+    if (!libre) return;
+    libre.style.display = sel.value === OPCION_LIBRE ? "" : "none";
+    // Si se elige uno de la lista, el campo manual deja de mandar.
+    if (sel.value !== OPCION_LIBRE) libre.value = "";
   };
+}
+
+/* ---------- Indicador del motor con el modelo en uso ---------- */
+function pintarMotor(info) {
+  if (!info) return;
+  const box = $("#engineBox"), nom = $("#engineName"), mod = $("#engineModel");
+  const corto = String(info.label || "").split("(")[0].trim();
+  if (nom) nom.textContent = corto;
+  if (mod) mod.textContent = info.model ? String(info.model) : "";
+  if (box) {
+    box.classList.toggle("remote", info.provider !== "local");
+    box.title = `Motor: ${info.label}\nModelo: ${info.model || "-"}\n`
+              + `Temperatura: ${info.temperature ?? "-"}`;
+  }
 }
 
 /* ------------------------------------------------------------ BOOT */
@@ -1597,19 +1617,25 @@ async function boot() {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(f).entries());
     if (f.id === "setForm") {
-      // Si el usuario escribio el modelo a mano, ese es el que cuenta.
+      // Solo cuenta el campo libre si se eligio la opcion de escribirlo a mano.
+      // Antes se aplicaba siempre y machacaba la eleccion del desplegable.
+      const sel = f.querySelector("[name=ai_model]");
       const libre = String(d.ai_model_libre || "").trim();
-      if (libre) d.ai_model = libre;
+      if (sel && sel.value === OPCION_LIBRE) d.ai_model = libre;
+      else if (sel) d.ai_model = sel.value;
       delete d.ai_model_libre;
       if (d.ai_provider !== "local" && !d.ai_api_key) delete d.ai_api_key;
-      if (!d.ai_model) { toast("Elige o escribe un modelo", "warn"); return; }
+      if (!d.ai_model || d.ai_model === OPCION_LIBRE) {
+        toast("Elige un modelo de la lista o escribilo a mano", "warn");
+        return;
+      }
     }
     try {
       await Api.post("/api/settings", d);
-      toast("Configuracion guardada", "ok");
+      toast("Guardado - modelo: " + (d.ai_model || "-"), "ok");
       const ping = await Api.get("/api/ping");
       State.engine = ping.ai;
-      $("#engineName").textContent = ping.ai.label;
+      pintarMotor(ping.ai);
       $("#engineBox").classList.toggle("remote", ping.ai.provider !== "local");
       if (f.id === "appForm" && d.theme) document.documentElement.dataset.theme = d.theme;
       if (f.id === "setForm") {
@@ -1617,6 +1643,8 @@ async function boot() {
         estadoModelos.info = await Api.get("/api/modelos").catch(() => ({}));
         const sel2 = $("#selModelo");
         if (sel2) { sel2.dataset.actual = d.ai_model; pintarModelos(estadoModelos.info, d.ai_model); }
+        const inf2 = $("#modelGuardado");
+        if (inf2) inf2.textContent = d.ai_model || "-";
       }
     } catch (err) { toast(err.message, "err"); }
   });
@@ -1642,7 +1670,7 @@ generacion automatica de programas personalizados.
 
 ## Modulos
 
-- **Plataforma:** Inicio, Mi Trabajo, Clientes, Contactos, Campanas, Favoritos
+- **Plataforma:** Inicio, Mi Trabajo, Clientes, Contactos, Campañas, Favoritos
 - **Flujo de Trabajo:** Mapa Localizador, Generador de Prompts, Chequeo de Seguridad, Precios, Prospectores
 - **Adicionales:** Nombres, Kit de Marca, Analizador, Presupuestos
 

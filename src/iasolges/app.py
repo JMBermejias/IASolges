@@ -24,7 +24,7 @@ VERSION = __version__   # fuente unica de verdad (src/iasolges/__init__.py)
 MODULES = {
     "clients": {"label": "Clientes", "icon": "users", "group": "Plataforma"},
     "contacts": {"label": "Contactos", "icon": "user-check", "group": "Plataforma"},
-    "campaigns": {"label": "Campanas", "icon": "megaphone", "group": "Plataforma"},
+    "campaigns": {"label": "Campañas", "icon": "megaphone", "group": "Plataforma"},
     "works": {"label": "Mi Trabajo", "icon": "briefcase", "group": "Plataforma"},
     "prompts": {"label": "Generador de Prompts", "icon": "terminal", "group": "Flujo de Trabajo"},
     "security_checks": {"label": "Chequeo de Seguridad", "icon": "shield", "group": "Flujo de Trabajo"},
@@ -97,7 +97,7 @@ class Api:
         out = {}
         with db._db_lock:
             for t, label in (("clients", "Clientes"), ("contacts", "Contactos"),
-                             ("campaigns", "Campanas"), ("quotes", "Presupuestos"),
+                             ("campaigns", "Campañas"), ("quotes", "Presupuestos"),
                              ("works", "Trabajos"), ("prospects", "Prospectos")):
                 rows = conn.execute(
                     f"SELECT substr(COALESCE(created_at,'2026-01-01'),1,7) m, COUNT(*) c "
@@ -431,6 +431,8 @@ class Api:
         s["ai_api_key_set"] = bool(key)
         s["ai_api_key_hint"] = ("*" * 4 + key[-4:]) if len(key) >= 4 else ""
         s["ai_provider_info"] = ai.provider_info(self.db)
+        s["ai_model"] = s.get("ai_model", "motor-iasolges-v1")
+        s["ai_model_activo"] = ai.provider_info(self.db).get("model", s["ai_model"])
         s["providers"] = ai.PROVIDERS
         s["version"] = VERSION
         return s

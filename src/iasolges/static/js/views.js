@@ -13,7 +13,7 @@ const NAV = [
     { route: "mi-trabajo",    label: "Mi Trabajo",    icon: "briefcase", module: "works" },
     { route: "clientes",      label: "Clientes",      icon: "users",     module: "clients" },
     { route: "contactos",     label: "Contactos",     icon: "user-check", module: "contacts" },
-    { route: "campanas",      label: "Campanas",      icon: "megaphone", module: "campaigns" },
+    { route: "campanas",      label: "Campañas",      icon: "megaphone", module: "campaigns" },
     { route: "favoritos",     label: "Favoritos",     icon: "star" },
   ]},
   { group: "Flujo de Trabajo", items: [
@@ -36,7 +36,7 @@ const DASH_CARDS = [
   { route: "mi-trabajo", label: "Mi Trabajo",   group: "Plataforma",       icon: "briefcase",   desc: "Tus proyectos y programas generados con IA." },
   { route: "clientes", label: "Clientes",     group: "Plataforma",       icon: "users",       desc: "Cartera de clientes, segmentacion y analisis IA." },
   { route: "contactos", label: "Contactos",    group: "Plataforma",       icon: "user-check",  desc: "Personas de contacto vinculadas a cada cliente." },
-  { route: "campanas", label: "Campanas",     group: "Plataforma",       icon: "megaphone",   desc: "Estrategia, copy y calendario generados por IA." },
+  { route: "campanas", label: "Campañas",     group: "Plataforma",       icon: "megaphone",   desc: "Estrategia, copy y calendario generados por IA." },
   { route: "favoritos", label: "Favoritos",    group: "Plataforma",       icon: "star",        desc: "Todo lo que has marcado como favorito." },
   { route: "mapa", label: "Mapa Localizador Clientes",         group: "Flujo de Trabajo", icon: "map",         desc: "Localiza clientes potenciales por zona y sector." },
   { route: "prompts", label: "Generador de Prompts",      group: "Flujo de Trabajo", icon: "terminal",    desc: "Biblioteca y optimizador de prompts." },
@@ -122,7 +122,7 @@ VIEWS["inicio"] = async function () {
   const kpis = [
     { l: "Clientes",           v: num(d.clientes),        s: `${d.clientes_activos || 0} activos`,   i: "users",   c: "" },
     { l: "Contactos",          v: num(d.contactos),       s: "personas registradas",                i: "user-check", c: "" },
-    { l: "Campanas",           v: num(d.campanas),        s: `${d.campanas_activas || 0} activas`,   i: "megaphone", c: "accent" },
+    { l: "Campañas",           v: num(d.campanas),        s: `${d.campanas_activas || 0} activas`,   i: "megaphone", c: "accent" },
     { l: "Trabajos",           v: num(d.trabajos),        s: `${d.trabajos_pendientes || 0} abiertos`, i: "briefcase", c: "warn" },
     { l: "Presupuestos",       v: money(d.importe_presupuestos), s: `${d.presupuestos || 0} documentos`, i: "file-text", c: "ok" },
     { l: "Aprobado",           v: money(d.importe_aprobado),     s: `${d.presupuestos_aprobados || 0} cerrados`, i: "check", c: "ok" },
@@ -348,18 +348,18 @@ mod("contactos",{
 
 /* ------------------------------------------------------------ CAMPANAS */
 mod("campanas",{
-  module: "campaigns", title: "Campanas", addLabel: "Nueva campana",
+  module: "campaigns", title: "Campañas", addLabel: "Nueva campaña",
   desc: "Estrategia, copy y calendario generado automaticamente con IA.",
-  searchPh: "Buscar campana, objetivo...",
+  searchPh: "Buscar campaña, objetivo...",
   filters: [{ key: "status", label: "Todos los estados",
               options: [["borrador", "Borrador"], ["programada", "Programada"], ["activa", "Activa"], ["finalizada", "Finalizada"]] }],
   emptyIcon: "megaphone", emptyTitle: "Sin campanas",
-  emptyText: "Crea una campana y deja que la IA genere estrategia, copy y calendario.",
-  ai: { title: "Generador de campanas",
+  emptyText: "Crea una campaña y deja que la IA genere estrategia, copy y calendario.",
+  ai: { title: "Generador de campañas",
         desc: "Describe objetivo, sector y presupuesto. Obtendras estrategia, textos listos para publicar y calendario editorial.",
-        btn: "Generar campana", action: "campaign" },
+        btn: "Generar campaña", action: "campaign" },
   columns: [
-    { label: "Campana", render: r => rowTitle(r) },
+    { label: "Campaña", render: r => rowTitle(r) },
     { label: "Objetivo", render: r => `<div class="trunc">${esc(r.objective || "-")}</div>` },
     { label: "Canal", render: r => esc(r.channel || "-") },
     { label: "Presupuesto", num: true, render: r => money(r.budget) },
@@ -367,7 +367,7 @@ mod("campanas",{
     { label: "Generado", render: r => r.ai_strategy ? `<span class="badge b-ok">${icon("check", 10)} IA</span>` : `<span class="muted tiny">-</span>` },
   ],
   form: [
-    field("Nombre de la campana *", input("name"), null, true),
+    field("Nombre de la campaña *", input("name"), null, true),
     field("Objetivo *", input("objective", "", null, "Aumentar la captacion"), "Que quieres conseguir", true),
     field("Canal", select("channel", "multicanal", ["multicanal", "email", "linkedin", "seo", "paid", "telefono", "eventos"])),
     field("Sector", select("sector", "general", SECTORS.map(s => [s, s]))),
