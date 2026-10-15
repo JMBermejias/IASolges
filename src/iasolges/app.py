@@ -331,7 +331,7 @@ class Api:
                 "location": ctx["location"], "radius": ctx["radius"], "sector": ctx["sector"],
                 "business_type": res["results"][0]["business_type"] if res["results"] else "",
                 "filters": json.dumps(dict(ctx, center=res.get("center")), ensure_ascii=False),
-                "fuente": res.get("fuente", ""),
+                "fuente": res.get("fuente", ""), "aviso": res.get("aviso", ""),
                 "results": json.dumps(res["results"], ensure_ascii=False),
                 "total": res["total"], "ai_analysis": txt})
         elif action == "geo_detail":

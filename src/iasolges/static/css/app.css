@@ -506,3 +506,17 @@ tr:hover .row-actions{opacity:1}
 
 /* Iconos sueltos: trazo, sin relleno. El SVG del mapa mantiene sus rellenos. */
 svg.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Aviso sobre el mapa: datos de muestra vs. pocos resultados reales */
+.geo-aviso{
+  display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;
+  border-radius:12px;font-size:12.5px;line-height:1.5;
+}
+.geo-aviso>div{min-width:0}
+.geo-aviso svg{flex:0 0 auto;margin-top:2px}
+.geo-aviso.leve{background:rgba(125,211,252,.13);border:1px solid rgba(125,211,252,.4);color:var(--ink)}
+.geo-aviso.leve svg{stroke:var(--brand-2)}
+.geo-aviso.fuerte{background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.45);color:var(--ink)}
+.geo-aviso.fuerte svg{stroke:#DC2626}
+.geo-aviso p{margin:0 0 6px}
+.geo-aviso p:last-child{margin:0}

@@ -29,24 +29,61 @@ import urllib.request
 NOMINATIM = "https://nominatim.openstreetmap.org"
 UA_OSM = "IASolges/1.0 (+https://github.com/JMBermejias/IASolges; uso comercial local)"
 
-# Palabras que se buscan en OpenStreetMap para cada sector de la aplicacion.
+# Palabras que se buscan en OpenStreetMap para cada sector.
+#
+# Importante: OpenStreetMap esta etiquetado con lugares y oficios concretos
+# ("peluqueria", "fontaneria"), no con categorias de empresa ("constructora",
+# "consultoria"). Buscar "constructora" en un pueblo devuelve 0 aunque haya
+# veinte empresas de reformas. Por eso cada lista mezcla el termino
+# profesional con los oficios reales que se Findan en el mapa.
 CLAVES_SECTOR = {
-    "tecnologia": ["software", "informatic", "telecomunicaciones", "consultoria"],
-    "salud": ["centro de salud", "clinica", "fisioterapia", "dental", "farmacia",
-              "laboratorio clinico", "residencia"],
-    "legal": ["despacho de abogados", "asesoria fiscal", "gestoria", "notario"],
-    "construccion": ["constructora", "reformas", "inmovobiliaria", "arquitectos",
-                     "ingenieria"],
-    "ecommerce": ["comercio electronico", "tienda online", "distribuidor"],
-    "hosteleria": ["restaurante", "hotel", "cafe", "bar", "catering", "hosteleria"],
-    "educacion": ["academia", "centro de formacion", "escuela de negocios",
-                  "instituto", "guarderia", "colegio"],
-    "servicios": ["asesoria", "gestoria", "agencia", "consultora", "administracion",
-                  "seguros", "inmobiliaria", "lavanderia", "peluqueria", "fontaneria"],
-    "agricultura": ["agricola", "cooperativa", "viñedo", "finca", "agricultura"],
-    "industrial": ["industrial", "almacen", "fabricacion", "mantenimiento"],
-    "general": ["centro", "tienda", "servicios", "comercio"],
+    "tecnologia": ["informatica", "software", "telefonia", "telecomunicaciones",
+                   "servicios informaticos", "reparacion de computers", "consultoria"],
+    "salud": ["centro de salud", "clinica", "fisioterapia", "dental", "dentista",
+              "farmacia", "laboratorio", "veterinario", "psicologo", "podologo"],
+    "legal": ["despacho", "abogado", "asesoria", "gestoria", "notario",
+              "administracion de loteria", "inmobiliaria"],
+    "construccion": ["reformas", "fontaneria", "electricista", "carpinteria",
+                     "albanil", "cerrajeria", "instalaciones", "pintores",
+                     "inmobiliaria", "techos", "piscinas", "revestimientos"],
+    "ecommerce": ["tienda online", "comercio electronico", "distribuidor", "almacen",
+                  "mayorista", "envios"],
+    "hosteleria": ["restaurante", "hotel", "cafe", "bar", "catering", "panaderia",
+                   "pizzeria", "taperia", "hostal", "residencia"],
+    "educacion": ["academia", "centro de formacion", "escuela", "instituto",
+                  "guarderia", "colegio", "autoescuela", "conservatorio"],
+    "servicios": ["asesoria", "gestoria", "agencia", "consultora", "seguros",
+                  "inmobiliaria", "lavanderia", "peluqueria", "esteticista",
+                  "spa", "masajes", "limpieza", "traduccion"],
+    "agricultura": ["agricola", "cooperativa", "vinedo", "finca", "vivero",
+                    "riego", "almacen agricola"],
+    "industrial": ["industrial", "almacen", "metalurgica", "mantenimiento",
+                   "caldereria", "carpinteria metalica", "envasado"],
+    "general": ["tienda", "servicios", "comercio", "empresa", "centro", "almacen"],
 }
+
+# Si con la lista del sector no salen suficientes, se prueban estos oficios
+# Amplios antes de recurrir a palabras genericas.
+AMPLIAR = {
+    "tecnologia": ["impresion", "fotocopia", "electronica", "cable"],
+    "salud": ["ortopedia", "optica", "auditorio", "nutricion", "fisioterapia"],
+    "legal": ["seguros", "comunidad de propietarios"],
+    "construccion": ["excavaciones", "hormigon", "vidrieria", "ceramica", "calefaccion"],
+    "ecommerce": ["papeleria", "ferreteria"],
+    "hosteleria": ["cocina", "pasteleria", "asador", "marisqueria"],
+    "educacion": ["musica", "baile", "idiomas", "refuerzo"],
+    "servicios": ["tapiceria", "cerrajeria", "rotulacion", "carnets"],
+    "agricultura": ["olivar", "almendro", "agricultura"],
+    "industrial": ["calderas", "electricidad industrial", "maquinaria"],
+    "general": ["restaurante", "peluqueria", "panaderia", "farmacia", "fontaneria"],
+}
+
+# Ultimo recurso: palabras que existen en cualquier pueblo.
+GENERICOS = ["tienda", "empresa", "servicios", "comercio"]
+
+# Tope de peticiones a Nominatim por busqueda. Cada una tarda 1-2 s y su
+# politica pide no abusar: mejor menos resultados que bloquearse.
+MAX_PETICIONES = 12
 
 # Tipos que se ofrecen en el desplegable de la aplicacion, por sector.
 ETIQUETAS = {
@@ -171,62 +208,71 @@ def buscar_reales(localidad, sector, radio, limite=20, tipo=""):
 
     Devuelve una lista de dicts con la misma forma que usa el mapa. Si no hay
     conexion o no se encuentra nada, devuelve lista vacia: el llamante cae a
-    los datos de muestra.
+    los datos de muestra avisando al usuario.
     """
     sector = (sector or "general").lower()
     radio = max(1, min(100, int(radio or 10)))
     limite = max(1, min(60, int(limite or 20)))
     lat, lon, _ = geocodificar(localidad)
 
-    claves = CLAVES_SECTOR.get(sector, CLAVES_SECTOR["general"])
     if tipo:
-        # El usuario ha filtrado por un tipo concreto: se busca solo ese.
-        claves = [tipo.lower()]
+        rondas = [[tipo.lower()]]
+    else:
+        rondas = [CLAVES_SECTOR.get(sector, CLAVES_SECTOR["general"]),
+                  AMPLIAR.get(sector, []), GENERICOS]
 
     vistos = {}
-    for clave in claves:
+    pedidos = 0
+
+    def _consulta(clave):
+        """Una peticion a Nominatim, con su cache en disco."""
         consulta = "%s, %s" % (clave, localidad)
         ck = _clave_cache("b", consulta, radio, limite)
         got = _cache_leer(ck)
-        if got is None:
-            try:
-                got = _pedir("search", {
-                    "q": consulta, "format": "jsonv2", "limit": str(min(50, limite * 3)),
-                    "addressdetails": "1", "extratags": "1", "countrycodes": "es",
-                })
-            except (urllib.error.URLError, urllib.error.HTTPError, OSError,
-                    ValueError, TimeoutError):
-                got = []
-            _cache_escribir(ck, got)
-            if not got:
-                continue
-        for d in got:
-            nombre = (d.get("name") or d.get("display_name") or "").split(",")[0].strip()
-            if not nombre or len(nombre) < 3:
-                continue
-            try:
-                flat, flon = float(d["lat"]), float(d["lon"])
-            except (KeyError, ValueError, TypeError):
-                continue
-            dist = _distancia(lat, lon, flat, flon)
-            if dist > radio:
-                continue
-            cat = d.get("category") or ""
-            sub = d.get("type") or ""
-            if nombre in vistos and dist >= vistos[nombre]["distance"]:
-                continue
-            vistos[nombre] = {
-                "name": nombre,
-                "business_type": _etiqueta(cat, sub, clave, sector),
-                "address": _direccion(d.get("address")) or d.get("display_name", ""),
-                "lat": round(flat, 6), "lon": round(flon, 6),
-                "distance": round(dist, 2),
-                # OpenStreetMap no publica telefono ni correo. Se dejan vacios
-                # a proposito: inventarlos seria peor que no tenerlos.
-                "phone": "", "email": "", "website": "",
-                "score": 0, "size": "", "pain": "", "real": True,
-                "osm_id": "%s/%s" % (d.get("osm_type", "node"), d.get("osm_id", "")),
-            }
+        if got is not None:
+            return got
+        try:
+            got = _pedir("search", {
+                "q": consulta, "format": "jsonv2", "limit": str(min(50, limite * 3)),
+                "addressdetails": "1", "extratags": "1", "countrycodes": "es",
+            })
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError,
+                ValueError, TimeoutError):
+            got = []
+        _cache_escribir(ck, got)
+        return got
+
+    for claves in rondas:
+        for clave in claves:
+            if pedidos >= MAX_PETICIONES or len(vistos) >= limite:
+                break
+            pedidos += 1
+            for d in _consulta(clave):
+                nombre = (d.get("name") or "").strip()
+                if not nombre or len(nombre) < 3:
+                    continue
+                try:
+                    flat, flon = float(d["lat"]), float(d["lon"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                dist = _distancia(lat, lon, flat, flon)
+                if dist > radio:
+                    continue
+                if nombre in vistos and dist >= vistos[nombre]["distance"]:
+                    continue
+                vistos[nombre] = {
+                    "name": nombre,
+                    "business_type": _etiqueta(d.get("category") or "",
+                                                d.get("type") or "", clave, sector),
+                    "address": _direccion(d.get("address")) or d.get("display_name", ""),
+                    "lat": round(flat, 6), "lon": round(flon, 6),
+                    "distance": round(dist, 2),
+                    # OpenStreetMap no publica telefono ni correo. Se dejan
+                    # vacios a proposito: inventarlos seria peor que no tenerlos.
+                    "phone": "", "email": "", "website": "",
+                    "score": 0, "size": "", "pain": "", "real": True,
+                    "osm_id": "%s/%s" % (d.get("osm_type", "node"), d.get("osm_id", "")),
+                }
         if len(vistos) >= limite:
             break
 

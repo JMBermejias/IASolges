@@ -470,6 +470,7 @@ VIEWS["mapa"] = async function (params) {
       // Guardamos los resultados para que afterRender monte el mapa y la
       // seleccion: sin esto, al reabrir una busqueda guardada los marcadores
       // no respondian y "Analizar seleccion" no tenia nada que enviar.
+      res.aviso = g.aviso || "";
       GeoPendiente = { id: g.id, results: res.results, analysis: g.ai_analysis || "" };
     } catch (e) {}
   }
@@ -623,6 +624,10 @@ function mapHtml(res) {
     <div class="map-info"><b>${esc(res.location)}</b> — radio ${res.radius} km<br>
       <span class="muted tiny">Sector ${esc(res.sector || "general")} · ${pts.length} ${real ? "negocios reales" : "de muestra"}</span></div>
   </div>
+
+  ${res.aviso ? `<div class="geo-aviso ${res.real ? "leve" : "fuerte"}">
+      ${icon(res.real ? "info" : "alert", 16)}
+      <div>${md(res.aviso)}</div></div>` : ""}
 
   <div class="grid2 mb">
     <div class="panel"><div class="panel-head">

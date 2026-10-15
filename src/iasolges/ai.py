@@ -1009,21 +1009,33 @@ def _ll_geo(prompt, ctx):
     btype = ftype if ftype in tipos else tipos[0]
 
     # Primero, datos REALES de OpenStreetMap. Los de muestra quedan como
-    # respaldo para cuando no hay conexion o el sector no devuelve nada.
+    # respaldo, pero avisando: un negocio inventado con un telefono inventado es
+    # peor que no tener nada, porque se acaba llamando.
+    motivo = ""
     if (ctx.get("origin") or "real").lower() != "muestra":
         try:
             from . import osm
             reales, clat, clon = osm.buscar_reales(loc, sector, radius, n, ftype)
-        except Exception:
-            reales = []
+        except Exception as e:
+            reales, motivo = [], str(e).strip().rstrip(".")
         if reales:
+            if len(reales) < min(n, 5):
+                aviso = ("Solo se han encontrado **%d** negocios reales de este sector en "
+                         "un radio de %d km. OpenStreetMap es un mapa, no una guia "
+                         "comercial: los negocios que no estan en el no aparecen. Prueba "
+                         "con otro sector o con la opcion **Muestra del Motor IA** para "
+                         "planificar." % (len(reales), radius))
+            else:
+                aviso = ""
             return {
                 "location": loc, "radius": radius, "sector": sector,
                 "center": {"lat": clat, "lon": clon},
                 "results": reales, "total": len(reales),
-                "real": True, "fuente": "OpenStreetMap",
+                "real": True, "fuente": "OpenStreetMap", "aviso": aviso,
                 "analysis": _texto_geo_real(loc, sector, radius, reales, clat, clon),
             }
+        motivo = motivo or ("no hay negocios reales de '%s' catalogados en OpenStreetMap "
+                            "cerca de '%s'" % (sector, loc))
 
     key = next((k for k in ZONAS if k in loc.lower()), "general")
     base = ZONAS.get(key, ZONAS["madrid"])
@@ -1060,6 +1072,9 @@ def _ll_geo(prompt, ctx):
         "location": loc, "radius": radius, "sector": sector, "center": {"lat": lat, "lon": lon},
         "results": results, "total": len(results),
         "real": False, "fuente": "Muestra del Motor IA Local",
+        "aviso": ("**Estos NO son negocios reales.** Son inventados para planificar, "
+                  "con telefonos y correos tambien falsos: no los llames. Motivo: %s. "
+                  "Si tenes conexion, revisa la conexion y prueba otro sector." % motivo),
         "analysis": (
             f"# Mapa Localizador de Clientes - {loc}\n\n"
             f"**Radio:** {radius} km | **Sector:** {sector} | **Resultados:** {len(results)}\n\n"

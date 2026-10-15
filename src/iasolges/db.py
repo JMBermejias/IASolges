@@ -387,7 +387,8 @@ EXPECTED = {
     "analyses": {"starred": "INTEGER DEFAULT 0", "created_at": "TEXT DEFAULT ''",
                  "updated_at": "TEXT DEFAULT ''"},
     "geo_searches": {"starred": "INTEGER DEFAULT 0", "created_at": "TEXT DEFAULT ''",
-                     "updated_at": "TEXT DEFAULT ''", "fuente": "TEXT DEFAULT ''"},
+                     "updated_at": "TEXT DEFAULT ''", "fuente": "TEXT DEFAULT ''",
+                     "aviso": "TEXT DEFAULT ''"},
     "security_checks": {"starred": "INTEGER DEFAULT 0", "created_at": "TEXT DEFAULT ''",
                         "updated_at": "TEXT DEFAULT ''"},
 }
@@ -514,7 +515,7 @@ FIELDS = {
                "tax_rate", "discount", "notes", "terms", "ai_narrative", "starred"],
     "analyses": ["title", "type", "content", "summary", "result", "score", "starred"],
     "geo_searches": ["location", "radius", "sector", "business_type", "filters", "results",
-                     "total", "ai_analysis", "fuente", "starred"],
+                     "total", "ai_analysis", "fuente", "aviso", "starred"],
     "quote_items": ["quote_id", "description", "category", "qty", "unit_price",
                     "discount", "tax_rate"],
 }

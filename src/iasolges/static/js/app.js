@@ -1197,12 +1197,16 @@ document.addEventListener("submit", async (e) => {
   if (f.id === "geoForm") {
     const d = Object.fromEntries(new FormData(f).entries());
     $("#geoResult").innerHTML = `<div class="loading"><span class="spin dark"></span>
-      Buscando oportunidades y analizando el mercado...</div>`;
+      ${d.origin === "muestra"
+        ? "Generando datos de muestra..."
+        : "Buscando negocios reales en OpenStreetMap y analizando el mercado...<br>"
+          + "<span class='muted tiny'>Puede tardar 10-15 segundos: se consulta una "
+          + "base de datos abierta de todo el mundo.</span>"}</div>`;
     try {
       const r = await Api.post("/api/ai/geo", d);
       $("#geoResult").innerHTML = mapHtml({ location: r.location, radius: r.radius,
         sector: r.sector, results: r.results, analysis: r.analysis,
-        center: r.center, real: r.real, fuente: r.fuente });
+        center: r.center, real: r.real, fuente: r.fuente, aviso: r.aviso });
       GeoPendiente = { id: r.record && r.record.id, results: r.results, analysis: r.analysis || "" };
       Geo.montar(r.results);
       toast(r.results.length + (r.real ? " negocios reales" : " oportunidades de muestra")
